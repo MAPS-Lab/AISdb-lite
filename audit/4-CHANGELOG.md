@@ -175,6 +175,69 @@ Brief description of this analysis run.
 | 2025-12-11 | 3.1.0 (Initial) | Changelog created | N/A |
 | 2025-12-11 | 3.2.0 | Verification analysis, roadmap validation | +500 |
 | 2025-12-11 | - | **PROMPT UPDATE**: Added self-hosted infrastructure philosophy | 4-PROMPT.md |
+| 2025-12-11 | - | **PROMPT UPDATE**: Added PostGIS/TimescaleDB data architecture | 4-PROMPT.md |
+
+---
+
+## [Prompt Update 2025-12-11] - Prompt Version 1.2.0
+
+### Summary
+Added comprehensive PostGIS and TimescaleDB data organization and management guidance to 4-PROMPT.md. This ensures future reports include proper spatial-temporal database architecture with detailed planning and diagrams.
+
+### Changes to 4-PROMPT.md
+
+#### [ADDED] Agent 4.5: PostGIS Spatial Data Architecture
+- Geometry vs Geography type decision framework
+- GEOGRAPHY(POINT, 4326) for global AIS data accuracy
+- Generated column design for spatial data
+- Spatial index strategy (GiST, SP-GiST, BRIN)
+- PostGIS + TimescaleDB integration patterns
+- ASCII diagram: Spatial Data Organization
+
+#### [ADDED] Agent 4.6: TimescaleDB Advanced Configuration
+- Chunk interval analysis (7-day chunks for shipping patterns)
+- Compression configuration (segmentby=mmsi, orderby=time DESC)
+- Continuous aggregates design (hourly, daily, weekly)
+- Tiered storage with tablespaces (/fast-array, /slow-array)
+- Data lifecycle automation procedures
+- ASCII diagram: TimescaleDB Data Lifecycle
+
+#### [ADDED] Agent 4.7: Combined PostGIS + TimescaleDB Optimization
+- Spatial-temporal query execution strategy
+- Combined index strategy for vessel tracking
+- Query optimization patterns (time filter BEFORE spatial)
+- Common anti-patterns to avoid
+- EXPLAIN ANALYZE verification guidance
+- ASCII diagram: Spatial-Temporal Query Execution
+
+#### [ADDED] Agent 4.8: Storage Planning and Capacity Management
+- Storage calculation model (~162 bytes/row uncompressed)
+- Compression ratios: TimescaleDB 10:1, Parquet ZSTD 50:1
+- Capacity planning tables by scale (Small to Global)
+- Storage array allocation strategy
+- Monitoring queries for chunk health
+- Backup strategy with PITR
+- ASCII diagram: Storage Architecture
+
+#### [UPDATED] Final Report Structure
+Expanded from 22 sections to 29 sections:
+- Added sections 11-14 for database architecture details
+- Added sections 22-24 for new architecture diagrams
+- Renumbered subsequent sections
+
+### Statistics
+- New Agent Definitions: 4
+- New ASCII Diagrams: 4
+- SQL Code Examples: 15+
+- Lines Added: ~550
+
+### Rationale
+PostGIS and TimescaleDB are the foundation of the AIS data pipeline:
+1. **Spatial accuracy**: GEOGRAPHY type for geodesic calculations
+2. **Time-series optimization**: Hypertables with proper chunking
+3. **Query performance**: Combined spatial-temporal indexing
+4. **Storage efficiency**: Compression + tiered tablespaces
+5. **Self-hosted**: Uses local /fast-array and /slow-array
 
 ---
 
