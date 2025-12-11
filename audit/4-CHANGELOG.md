@@ -4,6 +4,41 @@ This file tracks all changes made to `4-REPORT.md` across successive engineering
 
 ---
 
+## [Run 2025-12-11 19:15] - Report Version 4.1.0
+
+### Summary
+Critical correction to storage strategy based on actual workload requirements: 10+ years of historical AIS data for ML training. Traditional "Hot/Warm/Cold" tiering is inappropriate when historical data IS the primary workload. Updated to keep ALL data on /fast-array with /slow-array reserved for backups only.
+
+### Changes
+
+#### [UPDATED] Section 11.4: Storage Strategy for Historical Research Workloads
+- **CRITICAL CHANGE**: Replaced traditional tiered storage (Hot→Warm→Cold→Frozen) with research-optimized architecture
+- ALL historical data stays on /fast-array (NVMe) - no degradation to slower storage
+- /slow-array used for BACKUPS ONLY, not active query serving
+- Aggressive compression (24h delay instead of 7d) for storage efficiency
+- Full indexes on ALL chunks (no BRIN-only degradation for "cold" data)
+- NO retention policy - historical data is the PRIMARY asset
+- Added hardware sizing table for 10+ years at various scales
+
+#### [UPDATED] Section 13.3: Storage Array Allocation
+- Restructured diagram to show research-optimized architecture
+- Removed "move_chunk() after 30 days" - no data movement to slow storage
+- /slow-array purpose clarified: backups and optional Parquet exports only
+- Added explanation of why tiered storage is WRONG for ML training workloads
+
+#### [ADDED] Rationale
+- ML training requires full dataset scans across ALL years
+- Historical data accessed as frequently as recent data
+- Age-based storage degradation penalizes 90%+ of the data
+- 10x slower queries on historical data is unacceptable for research
+
+### Statistics
+- Sections Updated: 2 (11.4, 13.3)
+- Lines Changed: ~150
+- Total Report Size: ~4,130 lines
+
+---
+
 ## [Run 2025-12-11 18:45] - Report Version 4.0.0
 
 ### Summary

@@ -1,12 +1,12 @@
 # AISdb-Lite Engineering Blueprint: High-Performance PostgreSQL-Only AIS Pipeline
 
-**Version:** 3.1.0
-**Date:** December 10, 2025
+**Version:** 4.1.0
+**Date:** December 11, 2025
 **Classification:** Engineering Implementation Plan
 **Scope:** Complete System Refactoring for PostgreSQL-Only, Headless AIS Backend
 **Analysis Method:** Multi-Agent Deep Analysis with Source Code Verification
 **Deployment Target:** Single Fixed Machine (Bare Metal or VM)
-**Revision Notes:** v3.1.0 adds: normalization theory, VACUUM tuning, version-pinned library recommendations, enhanced deletion justifications, Rust vs Python decision framework
+**Revision Notes:** v4.1.0 - Storage strategy corrected for ML training on 10+ years historical data (ALL data on /fast-array, no tiered degradation). v4.0.0 added PostGIS/TimescaleDB data architecture with ASCII diagrams.
 
 ---
 
@@ -2287,102 +2287,162 @@ SELECT add_continuous_aggregate_policy(
 );
 ```
 
-### 11.4 Tiered Storage with Tablespaces
+### 11.4 Storage Strategy for Historical Research Workloads
+
+**Critical Workload Consideration:** This system targets ML/research training on **10+ years of historical AIS data**. Unlike operational dashboards where recent data dominates queries, historical research workloads access ALL data frequently and uniformly.
+
+**Key Insight:** The traditional "Hot/Warm/Cold" tier concept does NOT apply when historical data IS the primary workload.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                     TIMESCALEDB DATA LIFECYCLE                               │
+│              STORAGE STRATEGY FOR HISTORICAL RESEARCH WORKLOADS              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  TIME ──────────────────────────────────────────────────────────────────►   │
+│  WORKLOAD PROFILE:                                                          │
+│  ════════════════                                                           │
+│  • 10+ years of historical AIS data (primary dataset)                       │
+│  • ML training requires full dataset scans across ALL years                 │
+│  • Historical data is accessed as frequently as recent data                 │
+│  • Compression critical for storage efficiency, NOT for archival            │
+│  • Query performance matters equally for 2015 data and 2025 data            │
 │                                                                              │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
-│  │   INGEST    │    │     HOT     │    │    WARM     │    │    COLD     │  │
-│  │   (now)     │───►│  (0-7 days) │───►│ (7-30 days) │───►│  (30+ days) │  │
-│  └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘  │
+│  WHY TRADITIONAL TIERING IS WRONG FOR THIS WORKLOAD:                        │
+│  ───────────────────────────────────────────────────                        │
+│  ✗ Moving old data to /slow-array → 10x slower queries on 90%+ of data     │
+│  ✗ BRIN-only indexes on "cold" tier → Full scans for historical training   │
+│  ✗ "Frozen" Parquet export → Requires re-import for PostgreSQL queries     │
+│  ✗ Age-based degradation → Penalizes the data you need most                │
 │                                                                              │
-│  Storage:           /fast-array        /fast-array        /slow-array       │
-│  Format:            Uncompressed       TimescaleDB        TimescaleDB       │
-│  Compression:       None               Native (~10:1)     Native (~10:1)    │
-│  Indexes:           All                All                BRIN only         │
-│  Query Speed:       <10ms              <50ms              <500ms            │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                 CORRECT ARCHITECTURE FOR RESEARCH                    │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌─────────────┐    ┌─────────────────────────────────────────────────┐    │
+│  │   INGEST    │    │         COMPRESSED ACTIVE TIER                   │    │
+│  │   (now)     │───►│      (ALL 10+ years of historical data)          │    │
+│  │             │    │                                                   │    │
+│  │ Uncompressed│    │  Location: /fast-array (NVMe RAID)               │    │
+│  │ 24h only    │    │  Compression: TimescaleDB native (~10:1)         │    │
+│  │             │    │  Indexes: Full B-tree + GiST on ALL chunks       │    │
+│  │             │    │  Query Speed: <50ms for ANY time range           │    │
+│  └─────────────┘    └─────────────────────────────────────────────────┘    │
+│                                                                              │
+│  STORAGE ALLOCATION:                                                        │
+│  ═══════════════════                                                        │
+│  /fast-array (NVMe):                                                        │
+│    • ALL historical data (compressed)                                       │
+│    • ALL indexes (full B-tree + GiST, no degradation)                      │
+│    • Continuous aggregates                                                  │
+│    • WAL and temp space                                                     │
+│                                                                              │
+│  /slow-array (SATA):                                                        │
+│    • Backups ONLY (not active queries)                                      │
+│    • WAL archive for PITR                                                   │
+│    • Optional Parquet exports for external tools (Spark, DuckDB)           │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                    CONTINUOUS AGGREGATES                             │    │
-│  │  ┌─────────┐     ┌─────────┐     ┌─────────┐                        │    │
-│  │  │ Hourly  │     │  Daily  │     │ Weekly  │                        │    │
-│  │  │ (real-  │     │ (batch) │     │ (batch) │                        │    │
-│  │  │  time)  │     │         │     │         │                        │    │
-│  │  └─────────┘     └─────────┘     └─────────┘                        │    │
+│  │  Pre-computed summaries for dashboard/overview queries               │    │
+│  │  (ML training typically needs raw data, not aggregates)              │    │
+│  │  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐       │    │
+│  │  │ Hourly  │     │  Daily  │     │ Weekly  │     │ Monthly │       │    │
+│  │  │ summary │     │ summary │     │ summary │     │ summary │       │    │
+│  │  └─────────┘     └─────────┘     └─────────┘     └─────────┘       │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  FROZEN TIER (180+ days): Export to Parquet on /slow-array                  │
-│  Query via: DuckDB (analytical), re-import if needed (operational)          │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Tablespace Setup:**
+**Compression Configuration for Historical Research:**
 
 ```sql
--- Create tablespaces on different storage arrays
--- (Requires superuser; run as postgres user)
-CREATE TABLESPACE fast_storage LOCATION '/fast-array/pg-data-18/ts_fast';
-CREATE TABLESPACE slow_storage LOCATION '/slow-array/pg-archive/ts_slow';
-
--- Attach tablespaces to hypertable
-SELECT attach_tablespace('fast_storage', 'ais_global_dynamic');
-SELECT attach_tablespace('slow_storage', 'ais_global_dynamic');
-
--- Set default tablespace for new chunks
+-- Aggressive compression: compress after 24 hours (not 7 days)
+-- All data benefits from 10:1 compression while remaining fully queryable
 ALTER TABLE ais_global_dynamic SET (
-    timescaledb.tablespace = 'fast_storage'
+    timescaledb.compress = true,
+    timescaledb.compress_segmentby = 'mmsi',
+    timescaledb.compress_orderby = 'time DESC'
 );
+
+-- Aggressive compression policy - storage efficiency is critical for 10+ years
+SELECT add_compression_policy(
+    'ais_global_dynamic',
+    compress_after => INTERVAL '24 hours',  -- Aggressive: 24h not 7d
+    if_not_exists => TRUE
+);
+
+-- CRITICAL: NO retention policy - keep ALL historical data forever
+-- DO NOT add: add_retention_policy(...)
+-- Historical data is the PRIMARY asset, not waste to be discarded
 ```
 
-**Automated Tiering Procedure:**
+**Storage Capacity for 10+ Years Historical Data:**
+
+| Scale | 10 Years Raw | 10 Years Compressed | Index Overhead | Total /fast-array |
+|-------|-------------|---------------------|----------------|-------------------|
+| Small (1M/day) | 670 GB | 67 GB | ~35 GB | **~100 GB** |
+| Medium (10M/day) | 6.7 TB | 670 GB | ~350 GB | **~1 TB** |
+| Large (100M/day) | 67 TB | 6.7 TB | ~3.5 TB | **~10 TB** |
+| Global (1B/day) | 670 TB | 67 TB | ~35 TB | **~100 TB** |
+
+**Hardware Sizing for Historical Research:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    HARDWARE REQUIREMENTS (10 Years Data)                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  For MEDIUM scale (10M reports/day, 10 years):                              │
+│                                                                              │
+│  /fast-array (NVMe RAID):                                                   │
+│    Compressed data:     670 GB                                              │
+│    B-tree indexes:      ~200 GB                                             │
+│    GiST spatial index:  ~150 GB                                             │
+│    Continuous aggs:     ~50 GB                                              │
+│    WAL + temp:          ~100 GB                                             │
+│    Safety margin (20%): ~250 GB                                             │
+│    ─────────────────────────────                                            │
+│    TOTAL REQUIRED:      ~1.5 TB NVMe                                        │
+│                                                                              │
+│  /slow-array (SATA RAID):                                                   │
+│    Weekly backups (4x): ~400 GB                                             │
+│    WAL archive (14d):   ~50 GB                                              │
+│    Parquet exports:     ~50 GB (optional)                                   │
+│    ─────────────────────────────                                            │
+│    TOTAL REQUIRED:      ~500 GB SATA                                        │
+│                                                                              │
+│  RAM Requirements:                                                          │
+│    shared_buffers:      25% of RAM → 47 GB (on 188 GB system)              │
+│    Parallel workers:    Benefit from remaining RAM for query buffers        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Simplified Maintenance (No Tiering Logic):**
 
 ```sql
--- Automated data lifecycle management
-CREATE OR REPLACE PROCEDURE ais_data_lifecycle_management()
+-- Simplified lifecycle: just compression and aggregates, NO tiering
+CREATE OR REPLACE PROCEDURE ais_data_maintenance()
 LANGUAGE plpgsql AS $$
-DECLARE
-    moved_chunks INT := 0;
-    chunk_rec RECORD;
 BEGIN
-    -- 1. Move chunks older than 30 days to slow storage
-    FOR chunk_rec IN
-        SELECT chunk_schema || '.' || chunk_name AS full_name
-        FROM timescaledb_information.chunks
-        WHERE hypertable_name = 'ais_global_dynamic'
-          AND range_end < NOW() - INTERVAL '30 days'
-          AND data_nodes IS NULL  -- Not on slow storage yet
-    LOOP
-        PERFORM move_chunk(
-            chunk => chunk_rec.full_name,
-            destination_tablespace => 'slow_storage',
-            index_destination_tablespace => 'slow_storage'
-        );
-        moved_chunks := moved_chunks + 1;
-    END LOOP;
-
-    -- 2. Refresh continuous aggregates
+    -- 1. Refresh continuous aggregates (for dashboards, not ML training)
     CALL refresh_continuous_aggregate('ais_hourly_summary',
         NOW() - INTERVAL '2 days', NOW());
     CALL refresh_continuous_aggregate('ais_daily_summary',
         NOW() - INTERVAL '3 days', NOW());
 
-    -- 3. Update statistics on recent chunks
+    -- 2. Update statistics for query planner
     ANALYZE ais_global_dynamic;
 
-    RAISE NOTICE 'Data lifecycle: moved % chunks to slow storage', moved_chunks;
+    -- 3. Reindex if needed (rare, only after bulk loads)
+    -- REINDEX TABLE CONCURRENTLY ais_global_dynamic;
+
+    RAISE NOTICE 'Maintenance completed at %', NOW();
 END;
 $$;
 
--- Schedule via pg_cron (if installed) or external cron
--- Run daily at 3 AM
--- SELECT cron.schedule('ais-lifecycle', '0 3 * * *',
---     'CALL ais_data_lifecycle_management()');
+-- No chunk moving! All data stays on /fast-array
+-- Compression is handled automatically by add_compression_policy
 ```
 
 ---
@@ -2614,11 +2674,13 @@ WHERE time > EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')
 | Large | 18.5 GB | 1.85 GB | 6.75 TB | 675 GB | 135 GB |
 | Global | 185 GB | 18.5 GB | 67.5 TB | 6.75 TB | 1.35 TB |
 
-### 13.3 Storage Array Allocation
+### 13.3 Storage Array Allocation (Historical Research Optimized)
+
+**Key Principle:** For ML training on 10+ years of historical data, ALL data must be on fast storage. The /slow-array is for backups only, NOT for active query serving.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         STORAGE ARCHITECTURE                                 │
+│            STORAGE ARCHITECTURE FOR HISTORICAL RESEARCH WORKLOADS            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │  ┌─────────────────────────────────────┐                                    │
@@ -2628,47 +2690,58 @@ WHERE time > EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')
 │  │         500K+ IOPS random           │                                    │
 │  ├─────────────────────────────────────┤                                    │
 │  │  pg-data-18/                        │                                    │
-│  │  ├── base/          (system)        │                                    │
-│  │  ├── ts_fast/       (hot tablespace)│◄── Active writes, uncompressed     │
-│  │  │   └── _hyper_*   (hot chunks)    │    Query latency: <10ms            │
+│  │  ├── base/          (system DB)     │                                    │
+│  │  │                                  │                                    │
+│  │  ├── ais_data/      (ALL chunks)    │◄── ALL 10+ years of data          │
+│  │  │   ├── _hyper_*   (compressed)    │    Compression: ~10:1              │
+│  │  │   └── indexes/   (B-tree+GiST)   │    Full indexes on ALL chunks     │
+│  │  │                                  │                                    │
 │  │  ├── pg_wal/        (WAL files)     │◄── Transaction log                 │
 │  │  └── pgsql_tmp/     (sort/hash)     │◄── Query temp space                │
 │  │                                     │                                    │
-│  │  Reserved Space:                    │                                    │
-│  │  ├── Hot data (0-7 days): 50 GB     │                                    │
-│  │  ├── Warm data (7-30 days): 100 GB  │  (compressed, still on fast)       │
-│  │  ├── WAL files: 10 GB               │                                    │
-│  │  └── Temp/sort: 50 GB               │                                    │
+│  │  Storage for 10 Years (Medium):     │                                    │
+│  │  ├── Compressed data: 670 GB        │                                    │
+│  │  ├── B-tree indexes:  200 GB        │                                    │
+│  │  ├── GiST spatial:    150 GB        │                                    │
+│  │  ├── Continuous aggs: 50 GB         │                                    │
+│  │  ├── WAL + temp:      100 GB        │                                    │
+│  │  ├── Safety margin:   250 GB        │                                    │
+│  │  └───────────────────────────────── │                                    │
+│  │  TOTAL: ~1.5 TB NVMe required       │                                    │
 │  │                                     │                                    │
-│  │  TOTAL RESERVED: 210 GB minimum     │                                    │
+│  │  Query Performance:                 │                                    │
+│  │  • ALL chunks: <50ms (compressed)   │                                    │
+│  │  • Full dataset scans: viable       │                                    │
+│  │  • ML training: no slow-tier penalty│                                    │
 │  └─────────────────────────────────────┘                                    │
-│                    │                                                         │
-│                    │ move_chunk() after 30 days                              │
-│                    ▼                                                         │
+│                                                                              │
+│            NO DATA MOVEMENT TO SLOW STORAGE!                                 │
+│            All historical data stays on /fast-array                         │
+│                                                                              │
 │  ┌─────────────────────────────────────┐                                    │
 │  │           /slow-array               │                                    │
 │  │          (SATA RAID)                │                                    │
 │  │         500+ MB/s sequential        │                                    │
 │  │         10K IOPS random             │                                    │
 │  ├─────────────────────────────────────┤                                    │
-│  │  pg-archive/                        │                                    │
-│  │  └── ts_slow/       (cold tablespace)│◄── Historical queries             │
-│  │      └── _hyper_*   (cold chunks)   │    Query latency: <500ms           │
 │  │                                     │                                    │
-│  │  ais-archive/                       │                                    │
-│  │  └── parquet/       (frozen data)   │◄── Analytical queries (DuckDB)     │
-│  │      └── year=2024/month=01/*.parquet                                    │
+│  │  PURPOSE: BACKUPS ONLY              │                                    │
+│  │  ══════════════════════             │                                    │
+│  │  NOT for active queries!            │                                    │
 │  │                                     │                                    │
 │  │  pg-backups/                        │                                    │
-│  │  ├── base/          (weekly full)   │                                    │
-│  │  └── wal-archive/   (continuous)    │                                    │
+│  │  ├── base/          (weekly full)   │◄── pg_basebackup snapshots        │
+│  │  │   └── backup_YYYYMMDD/           │    Keep 4 weekly (~400 GB)         │
+│  │  │                                  │                                    │
+│  │  └── wal-archive/   (continuous)    │◄── WAL for PITR                   │
+│  │      └── *.wal                      │    Keep 14 days (~50 GB)           │
 │  │                                     │                                    │
-│  │  Growth Estimate (Medium scale):    │                                    │
-│  │  ├── Cold PostgreSQL: 500 GB/year   │                                    │
-│  │  ├── Parquet archives: 50 GB/year   │                                    │
-│  │  └── Backups: 100 GB rotating       │                                    │
+│  │  ais-exports/       (optional)      │                                    │
+│  │  └── parquet/       (for Spark/etc) │◄── External tool exports          │
+│  │      └── year=*/month=*/*.parquet   │    Only if needed                  │
 │  │                                     │                                    │
-│  │  TOTAL: ~650 GB/year growth         │                                    │
+│  │  TOTAL: ~500 GB (static, rotating)  │                                    │
+│  │                                     │                                    │
 │  └─────────────────────────────────────┘                                    │
 │                                                                              │
 │  BACKUP STRATEGY                                                            │
@@ -2677,7 +2750,13 @@ WHERE time > EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')
 │  • Continuous: WAL archiving to /slow-array/pg-backups/wal-archive/         │
 │  • Retention: 4 weekly backups, 14 days WAL                                 │
 │  • Recovery: PITR to any point in last 14 days                              │
-│  • Cold backup: rsync Parquet to offline storage monthly                    │
+│                                                                              │
+│  WHY NO DATA ON /slow-array:                                                │
+│  ═══════════════════════════                                                │
+│  • Historical data IS the primary workload                                  │
+│  • ML training scans ALL years equally                                      │
+│  • 10x slower queries on 90% of data is unacceptable                        │
+│  • Compression already provides 10:1 storage efficiency                     │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```

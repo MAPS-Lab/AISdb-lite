@@ -373,8 +373,21 @@ For each false positive:
 
 Check if 2-REPORT has any issues that should be FALSE POSITIVE based on code verification.
 
+IMPORTANT - Remnant Code/Documentation Check:
+When validating a false positive (e.g., "SQLite is not actually used"), also search for:
+- Remnant code references (imports, comments, dead code paths)
+- Outdated documentation mentioning the deprecated feature
+- Config files or examples still referencing it
+- Test fixtures or mocks using the old technology
+
+These remnants may cause earlier analysis agents to incorrectly identify the feature as
+in active use. If found, document them as cleanup candidates in the corrections section.
+
+Example: If SQLite is marked FALSE POSITIVE but `import sqlite3` exists in dead code,
+that import should be flagged for removal to prevent future false detections.
+
 Output:
-| Item | 1-REPORT Status | 2-REPORT Status | Fresh Verification | Action |
+| Item | 1-REPORT Status | 2-REPORT Status | Fresh Verification | Remnants Found | Action |
 ```
 
 ---
