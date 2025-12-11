@@ -1,9 +1,13 @@
 # AISdb-Lite: Engineering Blueprint & Refactoring Plan Prompt
 
-> **Prompt Version**: 1.0.0
+> **Prompt Version**: 1.1.0
 > **Target Report**: 4-REPORT.md
 > **Analysis Type**: Engineering Plan for High-Performance PostgreSQL-Only AIS Pipeline
 > **Last Updated**: December 2025
+
+### Version History
+- **1.1.0** (2025-12-11): Added "Self-Hosted Infrastructure Philosophy" section prohibiting external/cloud services. All storage, database, and processing must be self-contained on local infrastructure.
+- **1.0.0** (2025-12-10): Initial prompt version
 
 ---
 
@@ -888,9 +892,9 @@ DEPLOYMENT TARGET: Single Fixed Machine
 Assumptions:
 - CPU: 8-16 cores (modern x86_64)
 - RAM: 32-64 GB
-- Storage: NVMe SSD, 1-10 TB
+- Storage: Dual array (NVMe RAID for hot data, SATA RAID for cold/archive)
 - Network: Gigabit Ethernet
-- OS: Linux (Ubuntu 22.04 or similar)
+- OS: Linux (Pop!_OS/Ubuntu-based)
 
 NOT designing for:
 - Kubernetes/container orchestration
@@ -903,6 +907,146 @@ Optimization focus:
 - Efficient resource utilization
 - Minimal operational complexity
 - Best possible performance on this hardware
+```
+
+---
+
+## Self-Hosted Infrastructure Philosophy
+
+**MANDATORY**: All solutions MUST be self-contained and self-hosted. This is a core architectural constraint.
+
+### Prohibited External Dependencies
+
+```
+NEVER RECOMMEND:
+├── Cloud Storage Services
+│   ├── AWS S3, Glacier, EBS
+│   ├── Azure Blob Storage
+│   ├── Google Cloud Storage
+│   └── Any object storage "as a service"
+│
+├── Managed Database Services
+│   ├── AWS RDS, Aurora
+│   ├── Azure Database
+│   ├── Google Cloud SQL
+│   └── TimescaleDB Cloud
+│
+├── SaaS/PaaS Solutions
+│   ├── Hosted monitoring (Datadog, New Relic)
+│   ├── Hosted logging (Splunk Cloud, Loggly)
+│   ├── Hosted CI/CD (unless self-hosted option exists)
+│   └── Any recurring-cost services
+│
+├── External APIs with Costs
+│   ├── Paid geocoding services
+│   ├── Paid map tile services
+│   └── Any per-request billing models
+│
+└── Resource-for-Hire Models
+    ├── Cloud compute instances
+    ├── Serverless functions
+    └── Any elastic/on-demand resources
+```
+
+### Required Self-Hosted Alternatives
+
+```
+ALWAYS RECOMMEND:
+├── Storage
+│   ├── Local NVMe RAID for hot data (/fast-array)
+│   ├── Local SATA RAID for cold/archive data (/slow-array)
+│   ├── PostgreSQL tablespaces for tiered storage
+│   └── Local Parquet files for frozen data
+│
+├── Database
+│   ├── Self-hosted PostgreSQL
+│   ├── Self-hosted TimescaleDB extension
+│   ├── Self-hosted PostGIS extension
+│   └── Local backup to secondary storage
+│
+├── Monitoring & Logging
+│   ├── pg_stat_statements (built-in)
+│   ├── PostgreSQL logs (local)
+│   ├── System metrics via /proc (local)
+│   └── Custom monitoring scripts
+│
+├── Processing
+│   ├── Local Rust binaries
+│   ├── Local Python scripts
+│   ├── Cron jobs for scheduling
+│   └── Systemd services for daemons
+│
+└── Data Archival
+    ├── Local Parquet files with ZSTD compression
+    ├── DuckDB for analytical queries on archives
+    ├── PostgreSQL tablespaces on slow storage
+    └── Local backup rotation scripts
+```
+
+### Cost Analysis Requirements
+
+```
+WHEN DISCUSSING STORAGE/COSTS:
+
+DO NOT:
+- Reference cloud pricing ($/GB/month)
+- Compare against AWS/Azure/GCP costs
+- Suggest tiered cloud storage strategies
+- Recommend any external recurring costs
+
+DO:
+- Analyze storage efficiency (compression ratios)
+- Compare raw vs compressed sizes
+- Calculate local disk utilization
+- Recommend tiered LOCAL storage (NVMe vs SATA)
+- Focus on I/O performance characteristics
+- Discuss power efficiency for long-term storage
+
+EXAMPLE (CORRECT):
+| Tier | Storage Location | Compression | Size | I/O Speed |
+|------|------------------|-------------|------|-----------|
+| Hot | /fast-array (NVMe) | None | 10GB | 3GB/s |
+| Warm | /fast-array (NVMe) | TimescaleDB 10:1 | 1GB | 3GB/s |
+| Cold | /slow-array (SATA) | TimescaleDB 10:1 | 1GB | 500MB/s |
+| Frozen | /slow-array (SATA) | Parquet ZSTD 50:1 | 0.2GB | 500MB/s |
+
+EXAMPLE (INCORRECT - NEVER DO THIS):
+| Tier | Storage Type | Monthly Cost | Annual Cost |
+|------|-------------|--------------|-------------|
+| Hot | SSD (gp3) | $3.30 | $40 |
+| Cold | S3 Glacier | $11.65 | $140 |
+```
+
+### Rationale
+
+```
+WHY SELF-HOSTED ONLY:
+
+1. DATA SOVEREIGNTY
+   - Complete control over data location
+   - No third-party data access
+   - No vendor lock-in
+
+2. PREDICTABLE PERFORMANCE
+   - No network latency to external services
+   - No shared resource contention
+   - Consistent I/O characteristics
+
+3. DEEP UNDERSTANDING
+   - Must understand every component
+   - Can optimize at every layer
+   - No black-box dependencies
+
+4. LONG-TERM SUSTAINABILITY
+   - No recurring external costs
+   - No service discontinuation risk
+   - No pricing changes
+
+5. DEVELOPMENT PHILOSOPHY
+   - Build what we need
+   - Understand what we build
+   - Improve what we understand
+   - Time is not a constraint; correctness is
 ```
 
 ---

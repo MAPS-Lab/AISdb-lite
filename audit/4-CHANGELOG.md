@@ -174,6 +174,58 @@ Brief description of this analysis run.
 |----------|---------------|---------------|---------------|
 | 2025-12-11 | 3.1.0 (Initial) | Changelog created | N/A |
 | 2025-12-11 | 3.2.0 | Verification analysis, roadmap validation | +500 |
+| 2025-12-11 | - | **PROMPT UPDATE**: Added self-hosted infrastructure philosophy | 4-PROMPT.md |
+
+---
+
+## [Prompt Update 2025-12-11] - Prompt Version 1.1.0
+
+### Summary
+Updated 4-PROMPT.md to enforce self-hosted infrastructure philosophy. All future report generations will prohibit external/cloud service recommendations.
+
+### Changes to 4-PROMPT.md
+
+#### [ADDED] Self-Hosted Infrastructure Philosophy Section
+New mandatory constraints added:
+
+**Prohibited External Dependencies:**
+- Cloud storage services (AWS S3, Glacier, Azure Blob, GCP Storage)
+- Managed database services (RDS, Aurora, TimescaleDB Cloud)
+- SaaS/PaaS solutions with recurring costs
+- External APIs with per-request billing
+- Resource-for-hire models (cloud compute, serverless)
+
+**Required Self-Hosted Alternatives:**
+- Local NVMe RAID for hot data (/fast-array)
+- Local SATA RAID for cold/archive data (/slow-array)
+- PostgreSQL tablespaces for tiered storage
+- Local Parquet files with ZSTD compression
+- DuckDB for analytical queries on archives
+
+**Cost Analysis Requirements:**
+- Never reference cloud pricing ($/GB/month)
+- Focus on compression ratios and storage efficiency
+- Recommend tiered LOCAL storage (NVMe vs SATA)
+- Discuss I/O performance characteristics
+
+#### [UPDATED] Deployment Target Constraints
+- Updated storage assumption: "Dual array (NVMe RAID for hot data, SATA RAID for cold/archive)"
+- Updated OS: "Linux (Pop!_OS/Ubuntu-based)"
+
+### Rationale
+The development philosophy requires:
+1. Complete data sovereignty
+2. Deep understanding of every component
+3. No external dependencies or recurring costs
+4. Build, understand, and improve everything ourselves
+5. Time is not a constraint; correctness and self-reliance are
+
+### Impact on Future Reports
+The next regeneration of 4-REPORT.md will:
+- Remove AWS/cloud pricing references
+- Replace S3/Glacier storage with local Parquet archives
+- Use PostgreSQL tablespaces on /slow-array for cold tier
+- Focus on storage efficiency rather than cloud costs
 
 ---
 
