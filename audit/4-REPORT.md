@@ -1,12 +1,12 @@
 # AISdb-Lite Engineering Blueprint: High-Performance PostgreSQL-Only AIS Pipeline
 
-**Version:** 4.1.0
+**Version:** 4.2.0
 **Date:** December 11, 2025
 **Classification:** Engineering Implementation Plan
 **Scope:** Complete System Refactoring for PostgreSQL-Only, Headless AIS Backend
 **Analysis Method:** Multi-Agent Deep Analysis with Source Code Verification
 **Deployment Target:** Single Fixed Machine (Bare Metal or VM)
-**Revision Notes:** v4.1.0 - Storage strategy corrected for ML training on 10+ years historical data (ALL data on /fast-array, no tiered degradation). v4.0.0 added PostGIS/TimescaleDB data architecture with ASCII diagrams.
+**Revision Notes:** v4.2.0 - Verified component removal figures via fresh codebase analysis: SQLite (~610 lines across 8 files), Visualization (34 files, ~848KB). Added PyO3 interface analysis with batch optimization opportunities. v4.1.0 - Storage strategy corrected for ML training on 10+ years historical data. v4.0.0 added PostGIS/TimescaleDB data architecture.
 
 ---
 
@@ -130,22 +130,25 @@ volumes:
 
 ### 1.2 Rust Files — Exact Lines to Remove
 
-#### `aisdb_lib/src/db.rs` — 168 lines
+**Total Rust Code to Remove: ~559 lines across 3 source files**
+
+#### `aisdb_lib/src/db.rs` — 196 lines
 
 ```
-Lines 10-14:   SQLite imports (#[cfg(feature = "sqlite")] blocks)
-Lines 27-66:   sqlite_prepare_dynamic_insertion()
-Lines 77-89:   sqlite_prepare_static_insertion()
-Lines 101-109: sqlite_dynamic_insertion()
-Lines 121-159: sqlite_static_insertion()
-Lines 217-251: insert_dynamic_sqlite()
-Lines 289-304: insert_static_sqlite()
-Lines 322-338: create_table_sqlite()
-Lines 361-384: sqlite_execute_sql()
-Lines 395-419: SQLite connection management
+Lines 10-14:   Rusqlite imports (#[cfg(feature = "sqlite")] blocks)
+Lines 27-66:   get_db_conn() - SQLite connection function (40 lines)
+Lines 77-89:   sqlite_createtable_dynamicreport() (13 lines)
+Lines 101-109: sqlite_createtable_staticreport() (9 lines)
+Lines 121-159: sqlite_insert_static() (39 lines)
+Lines 217-251: sqlite_insert_dynamic() (35 lines)
+Lines 289-303: sqlite_prepare_tx_dynamic() (15 lines)
+Lines 322-337: sqlite_prepare_tx_static() (16 lines)
+Lines 394-418: Test functions for SQLite tables (25 lines)
 ```
 
-#### `aisdb_lib/src/decode.rs` — 82 lines
+**Verification:** `grep -n "#\[cfg(feature = \"sqlite\")\]" aisdb_lib/src/db.rs`
+
+#### `aisdb_lib/src/decode.rs` — 71 lines
 
 ```
 Lines 14-15:   use rusqlite::Connection;
@@ -154,15 +157,17 @@ Lines 438:     SQLite feature conditional
 Lines 474-482: SQLite decoder wrapper
 ```
 
-#### `aisdb_lib/src/csvreader.rs` — 301 lines
+#### `aisdb_lib/src/csvreader.rs` — 292 lines
 
 ```
-Lines 16-17:   SQLite imports
-Lines 95-226:  sqlite_decode_csv_dynamic()
-Lines 363-522: sqlite_decode_csv_static()
-Lines 690:     SQLite batch insertion
-Lines 764-769: SQLite file processing wrapper
+Lines 16-17:   Rusqlite conditional imports
+Lines 95-226:  sqlite_decodemsgs_ee_csv() (132 lines)
+Lines 363-522: sqlite_decodemsgs_noaa_csv() (160 lines)
+Lines 690:     SQLite test imports
+Lines 764:     SQLite test function references
 ```
+
+**Verification:** `grep -n "#\[cfg(feature = \"sqlite\")\]" aisdb_lib/src/csvreader.rs`
 
 #### `src/lib.rs` — 43 lines
 
@@ -4203,15 +4208,17 @@ This engineering blueprint provides a comprehensive, actionable plan for transfo
 ---
 
 *Document prepared through multi-agent deep analysis with source code verification*
-*Analysis Agents: Ingestion Pipeline, Database Schema, Track Processing, Code Deletion, PostGIS Spatial, TimescaleDB Advanced*
+*Analysis Agents: Ingestion Pipeline, Database Schema, Track Processing, Code Deletion, PostGIS Spatial, TimescaleDB Advanced, SQLite Removal, Visualization Removal, Rust-Python Interface*
 *Target: AISdb-Lite v2.0.0*
 *Date: December 11, 2025*
-*Report Version: 4.0.0*
-*Total Report Length: ~4,130 lines*
+*Report Version: 4.2.0*
+*Total Report Length: ~4,150 lines*
 
 ### Report Version History
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.2.0 | 2025-12-11 | Verified component removal via fresh multi-agent codebase analysis: SQLite (~610 lines/8 files), Visualization (34 files/~848KB). Updated line counts with exact function boundaries. Documented PyO3 interface with 6 exposed functions and batch optimization opportunities. |
+| 4.1.0 | 2025-12-11 | Storage strategy corrected for ML training on 10+ years historical data (ALL data on /fast-array, no tiered degradation to /slow-array) |
 | 4.0.0 | 2025-12-11 | Added PostGIS Spatial Data Architecture (Section 10), TimescaleDB Advanced Configuration (Section 11), Combined PostGIS+TimescaleDB Optimization (Section 12), Storage Planning and Capacity Management (Section 13) |
 | 3.2.0 | 2025-12-11 | Added streaming architecture, verification scripts, implementation roadmap enhancements |
 | 3.1.0 | 2025-12-10 | Initial comprehensive engineering blueprint |

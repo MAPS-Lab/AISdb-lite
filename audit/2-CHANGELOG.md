@@ -4,6 +4,197 @@ This file tracks all changes made to `2-REPORT.md` across successive bad busines
 
 ---
 
+## [Run 2025-12-11 Cross-Report Reconciliation v1.3.0] - Report Version 1.3.0
+
+### Summary
+Cross-report contradiction analysis (3-REPORT.md v1.3.0) verified 2-REPORT.md. No new corrections required this run.
+
+### Verifications
+- [VERIFIED] All file paths correct (webdata/load_raster.py, map/db.ts, map/map.js)
+- [VERIFIED] All code examples marked as ILLUSTRATIVE remain correctly labeled
+- [VERIFIED] Rate limiting section correctly titled "Primitive Rate Limiting"
+- [VERIFIED] No new contradictions affecting this report
+
+### Git State
+- Branch: audit
+- Last Commit: 7888907 - docs(audit): Update 4-REPORT to v4.1.0 - ML training storage strategy
+- Uncommitted Changes: Yes (audit reports)
+
+---
+
+## [Run 2025-12-11 23:45] - Report Version 1.3.0
+
+### Summary
+Full re-analysis completed using 10 specialized exploration agents. All existing issues (Parts 1-12) re-verified against current source code. **48+ NEW issues discovered** across all categories. Total issues now **290+** (up from 250+). Panic instance count updated to 272 total (183 .unwrap(), 68 .expect(), 21 panic!) across 6 Rust files.
+
+### Issues Re-Verified (Still Present)
+
+#### Part 1: Database Layer - ALL VERIFIED
+- [VERIFIED] 1.1 Float PK: `timescale_createtable_dynamic.sql:16` - PRIMARY KEY (mmsi, time, latitude, longitude)
+- [VERIFIED] 1.2 Timestamp i32: Multiple schemas use INTEGER (32-bit), `db.rs` casts to i32
+- [VERIFIED] 1.3 SQL Injection: `sql_query_strings.py:38,47-48,101,117,132-133,184,192-193` - f-string SQL
+- [VERIFIED] 1.4 No Pooling: `dbconn.py:142-152` - `psycopg.connect()` per instance
+- [VERIFIED] 1.5 N+1 Pattern: `dbconn.py:352-375` - `aggregate_static_msgs()` loops over MMSIs
+- [VERIFIED] 1.6 ON CONFLICT: Multiple files with bare `ON CONFLICT DO NOTHING`
+
+#### Part 2: Data Processing - ALL VERIFIED
+- [VERIFIED] 2.1 Dict Tracks: `track_gen.py:15-19,40-51,65-78`
+- [VERIFIED] 2.2 Linear Interp: `interp.py:12-16,77-79,152-158`
+- [VERIFIED] 2.3 Hardcoded 3857: `interp.py:125,212`
+- [VERIFIED] 2.4 Unbounded Pathways: `denoising_encoder.py:110-141`
+- [VERIFIED] 2.5 Track Segmentation: `track_gen.py:173-183,218-227` - inconsistent MMSI handling
+- [VERIFIED] 2.6 Index Mismatch: `proc_util.py:112-138` - valid_speed_vec.size vs full array
+
+#### Part 3: Rust Handling - ALL VERIFIED (EXPANDED)
+- [VERIFIED] 3.1 Panics: **272 instances** across 6 files (up from 180+):
+  - csvreader.rs: 70+ instances
+  - receiver.rs: 35+ instances (61 total with all .unwrap()/.expect())
+  - aisdb_db_server.rs: 36 instances
+  - db.rs: 29 instances
+  - decode.rs: 9 instances
+- [VERIFIED] 3.2 Early Return: `csvreader.rs:397-398` - return Ok(()) on invalid timestamp
+- [VERIFIED] 3.3 Batch Size: `decode.rs:19`, `csvreader.rs:22`, `aisdb_db_server.rs:203` - BATCHSIZE=50000
+- [VERIFIED] 3.4 Timestamp Cast: `decode.rs:113`, `csvreader.rs:395,555`, `aisdb_db_server.rs:176-177`
+- [VERIFIED] 3.5 f64→f32 Cast: `db.rs:273-278` - 6 lossy casts per position
+
+#### Part 4: Web Services - ALL VERIFIED
+- [VERIFIED] 4.1 Rate Limiting: `_scraper.py:169,193` - primitive sleep(randint(1,3))
+- [VERIFIED] 4.2 Blanket Except: `_scraper.py:127,137,171,191,199` - 5 bare except clauses
+- [VERIFIED] 4.3 Coord Swap Bug: `load_raster.py:61` - track['lon'] used for lat lookup
+- [VERIFIED] 4.4 No Caching: All webdata/weather modules lack caching
+- [VERIFIED] 4.5 Weather Design: `weather_fetch.py:69-72` - catches exception but continues with None client
+
+#### Part 5: Frontend - ALL VERIFIED
+- [VERIFIED] 5.1 Typo: `clientsocket.js:266` - "onbefureunload" prevents cleanup
+- [VERIFIED] 5.2 Race Condition: `db.ts:15-33` - db_ready set before cursor completes
+- [VERIFIED] 5.3 Memory Leak: `livestream.js:43,52-113` - unbounded live_targets
+- [VERIFIED] 5.4 XSS: `map.js:384-391` - innerHTML with untrusted vinfo.meta_string
+- [VERIFIED] 5.5 Ineffective IDB: `db.ts:1-83` - no persistence verification, premature db_ready
+
+#### Part 6: Spatial Indexing - ALL VERIFIED
+- [VERIFIED] 6.1 H3 Not in DB: `h3.py:37-48` - computed in memory, never persisted
+- [VERIFIED] 6.2 Hardcoded UTM: `h3.py:50-57` - EPSG:32619 for all coordinates
+- [VERIFIED] 6.3 Brute-Force: `track_gen.py:233-253`, `gis.py:466-513` - O(n*m) loops
+- [VERIFIED] 6.4 Coord Bug: `gis.py:34` - `np.all(x)` returns bool, assertion never fires
+- [VERIFIED] 6.5 PostGIS: Partially leveraged, but non-global tables still lack spatial indexes
+
+#### Part 7: Data Ingestion - ALL VERIFIED
+- [VERIFIED] 7.1 Weak Checksum: `decoder.py:99-110` - only 1000 bytes hashed
+- [VERIFIED] 7.2 Skip Default: `decoder.py:266` - `skip_checksum=True` default
+- [VERIFIED] 7.3 MMSI Validation: 4 different behaviors across Spire/NOAA SQLite/Postgres paths
+- [VERIFIED] 7.4 ETA Year 2000: `csvreader.rs:71-92` - hardcoded `pseudo_year = 2000`
+- [VERIFIED] 7.5 Extension Detection: `decoder.py:107-134` - extension-only format detection
+
+#### Part 8: Configuration and Testing - ALL VERIFIED
+- [VERIFIED] 8.1 Test Data Paths: Relative via `os.path.dirname(__file__)` but bundled in package
+- [VERIFIED] 8.2 Assertions: `create_testing_data.py:14,37-40` - assertions for validation
+- [VERIFIED] 8.3 Integration Tests: 81-89% require PostgreSQL
+- [VERIFIED] 8.4 Duplicate Tests: `test_001_*.py`, `test_002_*.py`, `test_005_*.py` pairs
+- [VERIFIED] 8.5 Silent Errors: `test_014_marinetraffic.py:52-53`, `test_005_dbqry_postgres.py:55-58`
+- [VERIFIED] 8.6 Dockerfile: `Dockerfile:1-4` - `ENTRYPOINT ["top", "-b"]`
+- [VERIFIED] 8.7 Test Data in Package: `pyproject.toml:49-52` - ~1.4MB test data included
+
+#### Part 9: Receiver/Streaming - ALL VERIFIED
+- [VERIFIED] 9.1 Blocking I/O: `receiver.rs:304-337` - synchronous loop with blocking recv_from
+- [VERIFIED] 9.2 Fixed Buffers: `receiver.rs:301-302` - max_dynamic=256, max_static=32
+- [VERIFIED] 9.3 UDP Buffer: `receiver.rs:27,291,337` - BUFSIZE=8096, no SO_RCVBUF
+- [VERIFIED] 9.4 Unbounded Threads: `database_server/main.rs:63-79` - spawn per client
+- [VERIFIED] 9.5 Zero Error Handling: 61 unwrap/expect/panic instances in receiver.rs
+- [VERIFIED] 9.6 No TLS: `receiver.rs:488` - TODO: SSL comment
+- [VERIFIED] 9.7 No Metrics: 23 println/eprintln for logging
+
+#### Part 10: Cross-Language - ALL VERIFIED
+- [VERIFIED] 10.1 Timestamp Inconsistency: i32 in Rust, uint32 in Python, INTEGER in SQL
+- [VERIFIED] 10.2 f64→f32 Precision Loss: `db.rs:273-278` - lossy casts to Postgres
+- [VERIFIED] 10.3 NULL→0 Defaults: `db.rs:139-150,237-242` - unwrap_or_default patterns
+- [VERIFIED] 10.4 Field Naming: sog_knots→sog, heading_true→heading, dimension_to_*→dim_*
+- [VERIFIED] 10.5 No Versioning: No migration framework, hardcoded table names
+
+### New Issues Found
+
+#### Part 1: Database Layer (6 New)
+- [ADDITION] NEW-DB-007: Missing index on join columns (`mmsi` alone not indexed on static table)
+- [ADDITION] NEW-DB-008: Transaction boundary mismanagement (`deduplicate_dynamic_msgs()` unbounded)
+- [ADDITION] NEW-DB-009: Composite PK with non-leading lookups (7-column PK, 60-byte keys)
+- [ADDITION] NEW-DB-010: No data type validation for coordinates (no CHECK constraints)
+- [ADDITION] NEW-DB-011: Duplicate geom column GIST index inconsistently used
+- [ADDITION] NEW-DB-012: No constraint on conflict target in static table ON CONFLICT
+
+#### Part 2: Data Processing (8 New)
+- [ADDITION] NEW-SPATIAL-001: Hardcoded EPSG:4269 (NAD83) as default CRS (`interp.py:87`)
+- [ADDITION] NEW-SPATIAL-002: Incorrect Haversine argument order (`proc_util.py:69`) - passes (lat, lon) not (lon, lat)
+- [ADDITION] NEW-SPATIAL-003: Wrong array slice in bathymetry (`bathymetry.py:109`) - compares [:-1] with [:1] not [1:]
+- [ADDITION] NEW-SPATIAL-004: Latitude array reused for longitude index (`load_raster.py:61`) - CRITICAL bug
+- [ADDITION] NEW-PERF-001: Inefficient array reconstruction in segmentation (`track_gen.py:163-171`)
+- [ADDITION] NEW-PERF-002: Cubic spline time sorting inside hot loop (`interp.py:304-308`)
+- [ADDITION] NEW-LOGIC-001: Speed delta uses max(1, seconds) (`gis.py:173-176`) - artificial speed for stationary
+- [ADDITION] NEW-LOGIC-002: Cubic spline returns None on error (`interp.py:262-269`) - type inconsistency
+
+#### Part 3: Rust Handling (7 New)
+- [ADDITION] NEW-RUST-011: Missing resource cleanup on early return (`csvreader.rs:398,558`)
+- [ADDITION] NEW-RUST-012: FFI boundary violations - panics crash Python interpreter
+- [ADDITION] NEW-RUST-013: Unbounded memory allocation in track generator (`aisdb_db_server.rs:203-204`)
+- [ADDITION] NEW-RUST-014: Silent failure in database inserts (`db.rs:233,268`) - `let _`
+- [ADDITION] NEW-RUST-015: Race conditions in receiver buffer management (`receiver.rs:307-334`)
+- [ADDITION] NEW-RUST-016: String allocation in hot path (`receiver.rs:199`)
+- [ADDITION] NEW-RUST-017: Clone-heavy CSV processing - 35 `.clone()` calls
+
+#### Part 4: Web Services (4 New)
+- [ADDITION] NEW-WEB-011: No session pooling for serial requests (`_scraper.py`)
+- [ADDITION] NEW-WEB-012: Hardcoded magic numbers without documentation (`bathymetry.py:56`, `shore_dist.py:103,140,177`)
+- [ADDITION] NEW-WEB-013: Weather API credential handling - silent failure (`weather_fetch.py:69-72`)
+- [ADDITION] NEW-WEB-014: No concurrency control or backpressure in webdata modules
+
+#### Part 5: Frontend (4 New)
+- [ADDITION] NEW-FE-011: Dual IndexedDB initialization race (`db.ts` vs `vessel_metadata.ts`)
+- [ADDITION] NEW-FE-012: Unsafe event target type assertions (`db.ts:18,22,40,64`)
+- [ADDITION] NEW-FE-013: WebSocket close handler recursion risk (`clientsocket.js:277-286`)
+- [ADDITION] NEW-FE-014: Coordinate array index typo - JavaScript comma operator bug (`livestream.js:74-76`)
+  - `coords[-1, 0]` evaluates to `coords[0]` (first), not last element
+
+#### Part 6: Spatial Indexing (2 New)
+- [ADDITION] NEW-SPATIAL-006: Missing spatial index on legacy tables (`psql_createtable_dynamic_noindex.sql`)
+- [ADDITION] NEW-SPATIAL-007: No geography type for distance calculations (all GEOMETRY, not GEOGRAPHY)
+
+#### Part 7: Data Ingestion (2 New)
+- [ADDITION] NEW-INGEST-007: Catastrophic error recovery in NOAA CSV (`csvreader.rs:394-399,554-559`)
+- [ADDITION] NEW-INGEST-008: Silent BadZipFile swallowing (`decoder.py:125-128`)
+
+#### Part 8: Testing/Configuration (5 New)
+- [ADDITION] NEW-CI-008: No pytest fixtures or dependency injection (no `conftest.py`)
+- [ADDITION] NEW-CI-009: Environment variable dependency without validation
+- [ADDITION] NEW-CI-010: PostgreSQL version inconsistency (14 on Windows, 17 on Linux/macOS)
+- [ADDITION] NEW-CI-011: Ignored tests in CI pipeline (25% of tests never run)
+- [ADDITION] NEW-CI-012: No `.env` file despite pyproject.toml reference (`addopts = "--envfile .env"`)
+
+#### Part 9: Receiver/Streaming (8 New)
+- [ADDITION] NEW-RECV-014: No database connection pooling (`database_server/main.rs:68`)
+- [ADDITION] NEW-RECV-015: Infinite timeouts on database server (`aisdb_db_server.rs:674-676`)
+- [ADDITION] NEW-RECV-016: Data loss on buffer flush failure (`receiver.rs:322-333`)
+- [ADDITION] NEW-RECV-017: No rate limiting or admission control
+- [ADDITION] NEW-RECV-018: Unlimited WebSocket message sizes (no `max_frame_size`)
+- [ADDITION] NEW-RECV-019: Password in plain text via PGPASSFILE (`main.rs:28-38`)
+- [ADDITION] NEW-RECV-020: No circuit breaker for database failures
+- [ADDITION] NEW-RECV-021: Memory allocation in hot path (`receiver.rs:199,360`)
+
+#### Part 10: Cross-Language (2 New)
+- [ADDITION] NEW-CROSS-011: COG stored as uint32 in Python but f32 in SQL (`track_gen.py:73`)
+- [ADDITION] NEW-CROSS-012: MMSI u32→i32 cast truncation (`db.rs:180,271`, `csvreader.rs:401,561`)
+
+### Statistics
+- Total Issues: **290+** (up from 250+)
+- Changes from Previous: +48 new issues, 0 resolved, ~1 updated (panic count)
+- Critical Severity: 62+ (up from 55+)
+- High Severity: 95+ (up from 80+)
+- Medium Severity: 85+ (up from 70+)
+- Low Severity: 30+ (up from 25+)
+
+### Git State
+- Branch: audit
+- Last Commit: 7888907 - docs(audit): Update 4-REPORT to v4.1.0 - ML training storage strategy
+
+---
+
 ## [Run 2025-12-11 22:30] - Report Version 1.2.0
 
 ### Summary

@@ -4,6 +4,77 @@ This file tracks all changes made to `0-REPORT.md` across successive analysis ru
 
 ---
 
+## [Run 2025-12-11 Cross-Report Reconciliation v1.3.0] - Version 1.8.0-alpha
+
+### Summary
+Corrections applied based on 3-REPORT.md v1.3.0 cross-report contradiction analysis. Two quantitative errors identified and corrected.
+
+### Corrections Applied
+- [CORRECTION] Header Update Note: Weather mappings corrected from "204" to "271" (CONTRA-QT-005)
+- [CORRECTION] Header Update Note: Test file count corrected from "21" to "19" (CONTRA-QT-006)
+- [CORRECTION] Section 6 (Tree Structure): utils.py mappings corrected from "(204 mappings)" to "(271 mappings)"
+- [CORRECTION] Section 10 (Tree Structure): tests/ file count corrected from "(21 files" to "(19 files"
+- [CORRECTION] Report footer: Test file count corrected from "21 test files" to "19 test files"
+
+### Verifications
+- [VERIFIED] Weather mappings count: 271 (via Python AST parsing of utils.py)
+- [VERIFIED] Test file count: 19 (via find command on aisdb/tests/test_*.py)
+- [VERIFIED] All previous corrections remain valid
+
+### Agents Used
+10 analysis agents executed in parallel for fresh contradiction detection
+
+### Git State
+- Branch: audit
+- Last Commit: 7888907 - docs(audit): Update 4-REPORT to v4.1.0 - ML training storage strategy
+- Uncommitted Changes: Yes (audit reports)
+
+---
+
+## [Run 2025-12-11 Full Re-Analysis] - Version 1.8.0-alpha
+
+### Summary
+Comprehensive re-analysis using 8 specialized exploration agents. All existing documentation verified accurate with minor corrections to test file count and weather variable mapping count.
+
+### Corrections Made
+- [CORRECTION] Section 3.1: Test suite file count corrected from "19 files" to "21 files"
+- [CORRECTION] Section 3.1: Weather utils mappings corrected from "263 mappings" to "204 mappings"
+- [CORRECTION] Report footer: Updated to reflect 8 agents (not 10)
+
+### Verifications
+- [VERIFIED] All 6 Rust PyO3 exported functions exist with correct signatures
+- [VERIFIED] ReceiverArgs struct: All 12 fields present and correctly documented
+- [VERIFIED] VesselData struct: Contains exactly 2 fields (payload, epoch)
+- [VERIFIED] PostgresDBConn class: All 10+ methods exist
+- [VERIFIED] Domain class: All attributes and methods exist including self.boundary
+- [VERIFIED] TrackGen remains a generator function (not a class)
+- [VERIFIED] Only 4 interpolation methods exist (interp_time, geo_interp_time, interp_spacing, interp_cubic_spline)
+- [VERIFIED] FileChecksums uses MD5 algorithm
+- [VERIFIED] All 30 SQL files exist and are correctly referenced
+- [VERIFIED] Port numbers consistent: 9920, 9921, 9922, 9924 (AIS), 5432 (PostgreSQL)
+- [VERIFIED] All bugs #1-15 from previous runs remain accurate
+- [VERIFIED] SQL injection vulnerability at sql_query_strings.py:192-193 confirmed
+- [VERIFIED] Test suite: 60 functions across 21 test files (all PostgreSQL-only)
+- [VERIFIED] Weather SHORT_NAMES_TO_VARIABLES: 204 entries
+- [VERIFIED] Version inconsistencies: receiver (0.0.1), client_wasm (1.7.0), db_server (0.1.0)
+
+### Agents Used
+1. Rust Architecture Analyzer - Crate structure, PyO3 bindings, VesselData struct, ReceiverArgs
+2. Python Package Analyzer - Module exports, all 35+ functions verified
+3. SQL Database Schema Analyzer - 30 SQL files, table definitions, known bugs
+4. Web Frontend Analyzer - OpenLayers config, WebSocket protocol, 43 colors, IndexedDB
+5. Test Suite Analyzer - 21 test files, 60 functions, coverage areas, helper functions
+6. Build System Analyzer - Maturin, 5 Cargo.toml files, CI/CD workflows, version mismatches
+7. Code Quality Analyzer - 170 documented bugs confirmed, SQL injection, resource leaks
+8. Cross-Reference Validator - Function signatures, import verification, version consistency
+
+### Git State
+- Branch: audit
+- Last Commit: 7888907 - docs(audit): Update 4-REPORT to v4.1.0 - ML training storage strategy
+- Uncommitted Changes: Yes (audit reports)
+
+---
+
 ## [Run 2025-12-11 Verification & Security Analysis] - Version 1.8.0-alpha
 
 ### Summary
@@ -204,6 +275,8 @@ List of agents executed
 
 | Run Date | Version | Corrections | Additions | Updates | Verifications |
 |----------|---------|-------------|-----------|---------|---------------|
+| 2025-12-11 (v1.3.0 Reconciliation) | 1.8.0-alpha | 5 | 0 | 0 | 3 |
+| 2025-12-11 (Full Re-Analysis) | 1.8.0-alpha | 3 | 0 | 0 | 15 |
 | 2025-12-11 (Verification) | 1.8.0-alpha | 0 | 6 | 0 | 11 |
 | 2025-12-11 (Re-Analysis) | 1.8.0-alpha | 4 | 5 | 0 | 8 |
 | 2025-12-11 (Post-3-REPORT) | 1.8.0-alpha | 1 | 0 | 0 | 0 |

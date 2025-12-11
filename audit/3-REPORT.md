@@ -3,14 +3,14 @@
 **Analysis Date:** December 2025
 **Reports Analyzed:** 0-REPORT.md, 1-REPORT.md, 2-REPORT.md
 **Analysis Method:** Unbiased fresh analysis with post-hoc merge
-**Report Version:** 1.2.0
-**Total Contradictions Found:** 18
-**New This Run:** 1
-**Verified (Still Present):** 14
+**Report Version:** 1.3.0
+**Total Contradictions Found:** 20
+**New This Run:** 2
+**Verified (Still Present):** 8
 **Resolved:** 12
 **Regressions:** 0
 
-> **RECONCILIATION STATUS:** Fresh analysis completed December 11, 2025 using 10 specialized agents. One new false positive identified: PYDB-008/PYDB-018 (SQLiteDBConn references) - these are NOT bugs because SQLiteDBConn doesn't exist anywhere in the codebase. TRACK-002 haversine bug previously identified as REGRESSION has been corrected in 1-REPORT.md.
+> **RECONCILIATION STATUS:** Fresh analysis completed December 11, 2025 using 10 specialized agents. Two new quantitative discrepancies identified: (1) Weather variable mappings count is 271, not 204 as claimed in 0-REPORT.md; (2) Test file count inconsistency in 0-REPORT.md (header says 19, body says 21, actual is 19). All previous corrections verified as properly applied. Haversine bug TRACK-002 confirmed as real bug with correct documentation.
 
 ---
 
@@ -42,9 +42,10 @@ PHASE 3: Apply Corrections
 
 **Fresh Analysis Results:**
 - 10 analysis agents executed
-- Source code verifications performed: 50+
-- New contradictions discovered: 1 (SQLiteDBConn false positive)
-- Regressions detected: 0 (TRACK-002 was already flagged, now verified)
+- Source code verifications performed: 60+
+- New contradictions discovered: 2 (weather mappings count, test file count)
+- Regressions detected: 0
+- All 17 documented changelog corrections verified as applied (100%)
 
 ### Reports Analyzed
 
@@ -61,9 +62,9 @@ PHASE 3: Apply Corrections
 | Line Numbers | 1 | 0 | 1 | 0 | 0 |
 | Code Snippets | 2 | 0 | 0 | 2 | 0 |
 | Severity Ratings | 1 | 0 | 1 | 0 | 0 |
-| Status Conflicts | 5 | 1 | 2 | 2 | 0 |
-| Statistics/Quantities | 3 | 0 | 3 | 0 | 0 |
-| **Total** | **18** | **1** | **7** | **10** | **0** |
+| Status Conflicts | 5 | 0 | 3 | 2 | 0 |
+| Statistics/Quantities | 5 | 2 | 3 | 0 | 0 |
+| **Total** | **20** | **2** | **8** | **10** | **0** |
 
 ---
 
@@ -398,7 +399,7 @@ ref AS (
 
 ### CONTRA-ST-004: SQLiteDBConn References
 
-**Status:** NEW - False Positive Identified
+**Status:** VERIFIED - Confirmed False Positive (previously documented v1.2.0)
 **Reports Affected:** 1-REPORT.md (PYDB-008, PYDB-018)
 **Contradiction:** 1-REPORT.md bugs PYDB-008 and PYDB-018 claim `SQLiteDBConn` is referenced but never imported
 
@@ -417,9 +418,9 @@ Additional verification in decoder.py:
 
 **Resolution:** SQLiteDBConn **DOES NOT EXIST** anywhere in the codebase. SQLite support has been completely removed. The bugs PYDB-008 and PYDB-018 reference non-existent code.
 
-**Corrections Required:**
-- 1-REPORT.md: PYDB-008 should be marked as FALSE POSITIVE (or clarified as stale reference)
-- 1-REPORT.md: PYDB-018 should be marked as FALSE POSITIVE
+**Corrections Applied (v1.2.0):**
+- 1-REPORT.md: PYDB-008 clarified as FALSE POSITIVE (dead code reference)
+- 1-REPORT.md: PYDB-018 clarified as FALSE POSITIVE (dead code reference)
 
 ---
 
@@ -523,6 +524,61 @@ $ grep -rn "PostgresDBConn\|POSTGRES" aisdb/tests/
 
 ---
 
+### CONTRA-QT-005: Weather Variable Mappings Count
+
+**Status:** NEW - Quantitative Discrepancy
+**Reports Affected:** 0-REPORT.md
+**Contradiction:**
+- 0-REPORT.md header: "Weather utils: 204 variable mappings (corrected from 263)"
+- 0-REPORT.md Section 6: References `utils.py - SHORT_NAMES_TO_VARIABLES (204 mappings)`
+- Actual count: **271 mappings**
+
+**Fresh Verification:**
+```bash
+$ python3 -c "
+import ast
+with open('/home/spadon/AISdb-lite/aisdb/weather/utils.py', 'r') as f:
+    content = f.read()
+tree = ast.parse(content)
+for node in ast.walk(tree):
+    if isinstance(node, ast.Dict):
+        print(f'Weather variable mappings: {len(node.keys)}')"
+# Output: Weather variable mappings: 271
+```
+
+**Resolution:** The actual `SHORT_NAMES_TO_VARIABLES` dictionary in `aisdb/weather/utils.py` contains **271 key-value pairs**, not 204. The original count of 263 was closer to accurate. The "correction" introduced an error.
+
+**Corrections Required:**
+- 0-REPORT.md: Header should state "Weather utils: 271 variable mappings"
+- 0-REPORT.md: Section 6 tree should show `utils.py - SHORT_NAMES_TO_VARIABLES (271 mappings)`
+
+---
+
+### CONTRA-QT-006: Test File Count Inconsistency
+
+**Status:** NEW - Internal Inconsistency in 0-REPORT.md
+**Reports Affected:** 0-REPORT.md
+**Contradiction:**
+- 0-REPORT.md header (line 19): "Verified 59 test functions across 19 test files"
+- 0-REPORT.md header (line 24): "Test suite: 60 functions across 21 test files (corrected from 19)"
+- 0-REPORT.md Section 10 tree (line 296): "tests/ (21 files, 60 functions)"
+- 0-REPORT.md stats table (line 2030): "Test Files | 19"
+- Actual count: **19 test files**
+
+**Fresh Verification:**
+```bash
+$ find /home/spadon/AISdb-lite/aisdb/tests -maxdepth 1 -name "test_*.py" -type f | wc -l
+19
+```
+
+**Resolution:** The codebase contains **19 test files**, not 21. The "correction from 19 to 21" was itself an error. The original count of 19 was correct.
+
+**Corrections Required:**
+- 0-REPORT.md: All references should consistently state "19 test files"
+- Remove the erroneous "(corrected from 19)" note that changed it to 21
+
+---
+
 ## Part 8: Cross-Reference Verification
 
 ### Issues Appearing in Multiple Reports
@@ -540,13 +596,14 @@ $ grep -rn "PostgresDBConn\|POSTGRES" aisdb/tests/
 
 ---
 
-## Part 9: Comparison with Previous Analysis (v1.1.0)
+## Part 9: Comparison with Previous Analysis (v1.2.0)
 
-### New Findings (Not in Previous 3-REPORT)
+### New Findings (This Run v1.3.0)
 
 | ID | Description | Impact |
 |----|-------------|--------|
-| CONTRA-ST-004 | SQLiteDBConn doesn't exist - PYDB-008/PYDB-018 are FALSE POSITIVES | LOW - affects 2 bug entries |
+| CONTRA-QT-005 | Weather mappings count is 271, not 204 | LOW - documentation accuracy |
+| CONTRA-QT-006 | Test file count is 19, not 21 (self-contradicting in 0-REPORT) | LOW - internal inconsistency |
 
 ### Regressions (Were Resolved, Now Present Again)
 
@@ -568,6 +625,7 @@ $ grep -rn "PostgresDBConn\|POSTGRES" aisdb/tests/
 | CONTRA-CS-002 | Connection example marked ILLUSTRATIVE | Dec 2025 |
 | CONTRA-ST-001 | Rate limiting exists (primitive) | Dec 2025 |
 | CONTRA-ST-003 | 'ref' alias valid via CTE | Dec 2025 |
+| CONTRA-ST-004 | SQLiteDBConn false positive clarified | Dec 2025 (v1.2.0) |
 | CONTRA-QT-001 | All tests are PostgreSQL-only | Dec 2025 |
 
 ### Items Previously Flagged as Regression, Now Verified Correct
@@ -580,16 +638,18 @@ $ grep -rn "PostgresDBConn\|POSTGRES" aisdb/tests/
 
 ## Part 10: Corrections Required This Run
 
-### Corrections to 1-REPORT.md
-
-| Bug ID | Current Status | Corrected Status | Reason | CONTRA-ID |
-|--------|----------------|------------------|--------|-----------|
-| PYDB-008 | Bug (HIGH) | Should clarify SQLiteDBConn doesn't exist | SQLiteDBConn not found anywhere | CONTRA-ST-004 |
-| PYDB-018 | Bug (HIGH) | Should clarify SQLiteDBConn doesn't exist | Same - duplicates PYDB-008 issue | CONTRA-ST-004 |
-
 ### Corrections to 0-REPORT.md
 
-No new corrections required this run. Previous corrections verified as applied.
+| Location | Current Value | Corrected Value | Reason | CONTRA-ID |
+|----------|---------------|-----------------|--------|-----------|
+| Header line 25 | "Weather utils: 204 variable mappings" | "Weather utils: 271 variable mappings" | Actual count is 271 | CONTRA-QT-005 |
+| Section 6 tree | "utils.py (204 mappings)" | "utils.py (271 mappings)" | Actual count is 271 | CONTRA-QT-005 |
+| Header line 24 | "21 test files (corrected from 19)" | "19 test files" | Actual count is 19 | CONTRA-QT-006 |
+| Section 10 tree | "tests/ (21 files, 60 functions)" | "tests/ (19 files, 60 functions)" | Actual count is 19 | CONTRA-QT-006 |
+
+### Corrections to 1-REPORT.md
+
+No new corrections required this run. Previous PYDB-008/PYDB-018 corrections (v1.2.0) verified as applied.
 
 ### Corrections to 2-REPORT.md
 
@@ -678,14 +738,34 @@ grep -B2 -A2 "haversine(" aisdb/proc_util.py
 3. SQLite support has been completely removed from codebase
 4. PYDB-008 and PYDB-018 reference non-existent class
 
-**Decision:** NEW finding - These bugs should be clarified as referring to removed code.
+**Decision:** Bugs clarified as referring to removed code (v1.2.0).
 
 ### CONTRA-ST-002 (Haversine Coordinate Order) - Current Status
 
 **Previous Analysis (v1.1.0):** Flagged as REGRESSION - bug was incorrectly marked FALSE POSITIVE
-**Current Analysis (v1.2.0):** VERIFIED - 1-REPORT TRACK-002 now correctly documents this as a REAL BUG with HIGH severity
+**Current Analysis (v1.2.0-1.3.0):** VERIFIED - 1-REPORT TRACK-002 now correctly documents this as a REAL BUG with HIGH severity
 
 **Decision:** No correction needed - 1-REPORT already has correct status.
+
+### CONTRA-QT-005 (Weather Mappings Count) - Decision Rationale
+
+**Fresh Analysis (Dec 11, 2025):**
+1. Parsed `aisdb/weather/utils.py` using Python AST
+2. Counted dictionary keys in `SHORT_NAMES_TO_VARIABLES`
+3. Found 271 mappings, not 204 as documented
+4. The original "263" was closer to correct than the "corrected" 204
+
+**Decision:** NEW finding - 0-REPORT.md requires correction.
+
+### CONTRA-QT-006 (Test File Count) - Decision Rationale
+
+**Fresh Analysis (Dec 11, 2025):**
+1. Used `find` to count test files in `aisdb/tests/`
+2. Found 19 test files (test_*.py)
+3. 0-REPORT.md has conflicting values: header says 19, body says 21
+4. The original 19 was correct; the "correction to 21" was erroneous
+
+**Decision:** NEW finding - 0-REPORT.md requires correction to restore 19.
 
 ---
 
@@ -706,15 +786,17 @@ grep -B2 -A2 "haversine(" aisdb/proc_util.py
 | CONTRA-ST-001 | Status | Rate limiting exists | OPEN | RESOLVED | Grep for time.sleep |
 | CONTRA-ST-002 | Status | Haversine coord order | REGRESSION (v1.1.0) | VERIFIED BUG | Parameter order analysis |
 | CONTRA-ST-003 | Status | 'ref' alias validity | OPEN | RESOLVED | CTE analysis |
-| CONTRA-ST-004 | Status | SQLiteDBConn references | N/A | **NEW** | Grep search |
+| CONTRA-ST-004 | Status | SQLiteDBConn references | NEW (v1.2.0) | VERIFIED | Grep search |
 | CONTRA-QT-001 | Quantity | Test database type | OPEN | RESOLVED | Grep search |
 | CONTRA-QT-002 | Quantity | Bug vs Decision overlap | MONITORING | VERIFIED | Cross-reference check |
 | CONTRA-QT-003 | Quantity | API export count | NEW (v1.1.0) | VERIFIED | Export count |
 | CONTRA-QT-004 | Quantity | Gebco method count | NEW (v1.1.0) | VERIFIED | Method inspection |
+| CONTRA-QT-005 | Quantity | Weather mappings (271 not 204) | N/A | **NEW** | AST parsing |
+| CONTRA-QT-006 | Quantity | Test files (19 not 21) | N/A | **NEW** | File count |
 
 ---
 
 *Report generated by cross-report contradiction analysis system*
 *Analysis Method: Unbiased fresh analysis with post-hoc merge*
 *AISdb-Lite Cross-Report Reconciliation*
-*December 11, 2025 - Version 1.2.0*
+*December 11, 2025 - Version 1.3.0*

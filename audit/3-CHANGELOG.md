@@ -4,6 +4,58 @@ This file tracks all changes made to `3-REPORT.md` across successive cross-repor
 
 ---
 
+## [Run 2025-12-11 Fresh Analysis v3] - Report Version 1.3.0
+
+### Summary
+Executed fresh unbiased analysis using 10 specialized agents. Discovered two new quantitative contradictions (CONTRA-QT-005: weather mappings count, CONTRA-QT-006: test file count inconsistency). All previous findings verified.
+
+### Analysis Method
+- Fresh analysis completed: Yes
+- Existing 3-REPORT.md found: Yes (v1.2.0)
+- Merge performed: Yes
+- Analysis agents executed: 10
+
+### New Contradictions Found
+- [ADDITION] CONTRA-QT-005: Weather variable mappings count is 271 in source code, but 0-REPORT claims 204 (was "corrected" from 263 erroneously)
+- [ADDITION] CONTRA-QT-006: Test file count internal inconsistency in 0-REPORT.md - header says 19, body says 21, actual count is 19
+
+### Contradictions Verified (Still Present)
+- [VERIFIED] CONTRA-LN-001: XSS vulnerability location (map.js lines 386-390) - still accurate
+- [VERIFIED] CONTRA-SV-001: Y2038 severity consistency - both reports say CRITICAL
+- [VERIFIED] CONTRA-ST-002: Haversine coordinate swap - bug correctly documented in 1-REPORT
+- [VERIFIED] CONTRA-ST-004: SQLiteDBConn false positive - confirmed no references exist
+- [VERIFIED] CONTRA-QT-002: Bug vs Decision count overlap - intentional, cross-references accurate
+- [VERIFIED] CONTRA-QT-003: API export count discrepancy - documented
+- [VERIFIED] CONTRA-QT-004: Gebco method count - documented
+- [VERIFIED] All 17 documented changelog corrections applied (100%)
+
+### Regressions Detected
+None
+
+### Corrections Applied to Source Reports
+
+#### 0-REPORT.md
+- [CORRECTED] Header Update Note: Weather mappings 204 → 271 (CONTRA-QT-005)
+- [CORRECTED] Header Update Note: Test files 21 → 19 (CONTRA-QT-006)
+- [CORRECTED] Section 6 tree: utils.py (204 mappings) → (271 mappings)
+- [CORRECTED] Section 10 tree: tests/ (21 files) → (19 files)
+- [CORRECTED] Footer: 21 test files → 19 test files
+
+### Statistics
+- Total Contradictions: 20
+- New This Run: 2 (CONTRA-QT-005, CONTRA-QT-006)
+- Verified: 8
+- Resolved: 12
+- Regressions: 0
+- Reports Modified: 0-REPORT.md
+
+### Git State
+- Branch: audit
+- Last Commit: 7888907 - docs(audit): Update 4-REPORT to v4.1.0 - ML training storage strategy
+- Uncommitted Changes: Yes (audit reports)
+
+---
+
 ## [Run 2025-12-11 Fresh Analysis v2] - Report Version 1.2.0
 
 ### Summary
@@ -339,8 +391,10 @@ Types:
 #### Quantities/Statistics (CONTRA-QT-)
 - CONTRA-QT-001: Test database type (RESOLVED)
 - CONTRA-QT-002: Bug vs Decision overlap (VERIFIED)
-- CONTRA-QT-003: API export count (NEW)
-- CONTRA-QT-004: Gebco method count (NEW)
+- CONTRA-QT-003: API export count (VERIFIED)
+- CONTRA-QT-004: Gebco method count (VERIFIED)
+- CONTRA-QT-005: Weather mappings count (NEW v1.3.0) - 271 actual, not 204
+- CONTRA-QT-006: Test file count inconsistency (NEW v1.3.0) - 19 actual, not 21
 
 ---
 
@@ -351,6 +405,8 @@ Types:
 | 2025-12-11 | 1.0.0 (Initial) | 15 | 0 | 12 | 0 | 15 |
 | 2025-12-11 | 1.0.1 (Post-Corrections) | 0 | 0 | 0 | 0 | 15 |
 | 2025-12-11 | 1.1.0 (Fresh Analysis) | 2 | 1 | 0 | 5 | 17 |
+| 2025-12-11 | 1.2.0 (Fresh Analysis v2) | 1 | 0 | 0 | 7 | 18 |
+| 2025-12-11 | 1.3.0 (Fresh Analysis v3) | 2 | 0 | 0 | 8 | 20 |
 
 ---
 
@@ -391,11 +447,11 @@ Types:
 
 ### Pending Items Summary
 
-4 items require attention:
-1. **CONTRA-ST-002 (REGRESSION)**: Haversine coordinate order - MUST reinstate TRACK-002 as real bug in 1-REPORT.md
-2. **CONTRA-QT-003 (NEW)**: API export counts need correction in 0-REPORT.md
-3. **CONTRA-QT-004 (NEW)**: Gebco method documentation needs clarification
-4. **CONTRA-SV-001 (MONITORING)**: Y2038 severity consistency - verified OK
+2 items require ongoing monitoring:
+1. **CONTRA-SV-001 (MONITORING)**: Y2038 severity consistency - verified OK
+2. **CONTRA-QT-002 (MONITORING)**: Bug vs Decision count overlap - verified OK
+
+All other items have been resolved or newly documented with corrections applied.
 
 ---
 

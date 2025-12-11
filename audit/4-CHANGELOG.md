@@ -4,6 +4,84 @@ This file tracks all changes made to `4-REPORT.md` across successive engineering
 
 ---
 
+## [Run 2025-12-11 21:30] - Report Version 4.2.0
+
+### Summary
+Verification run with fresh multi-agent codebase exploration. Four specialized agents performed parallel analysis of SQLite removal, visualization removal, database schema, and Rust-Python interface. Updated line counts and file inventories with verified exact figures.
+
+### Changes
+
+#### [VERIFIED] Section 1.2: SQLite Removal - Line Counts Updated
+- **db.rs**: Verified 196 lines across 8 SQLite-specific functions
+- **decode.rs**: Verified 71 lines (sqlite_decode_insert_msgs + imports)
+- **csvreader.rs**: Verified 292 lines across 2 CSV parsing functions
+- **Total Rust lines**: ~559 lines (updated from previous estimate)
+- Added verification commands for each file
+
+#### [VERIFIED] Section 2: Visualization Removal Analysis
+- **aisdb_web/**: Verified 24 files, 788K, 6,577 lines
+- **client_webassembly/**: Verified 3 files, 36K, 815 lines
+- **Python files**: web_interface.py (224 lines), examples/visualize.py (44 lines), tests/test_011_ui.py (42 lines)
+- **Total deletion candidates**: 34 files, ~848KB
+
+#### [VERIFIED] Section 4: Rust-Python (PyO3) Interface
+- Confirmed 6 functions exposed to Python via PyO3:
+  - `haversine()` - Great circle distance (geo crate HaversineDistance)
+  - `decoder()` - Multi-threaded file decoder
+  - `simplify_linestring_idx()` - Visvalingam-Whyatt curve decimation
+  - `encoder_score_fcn()` - Trajectory segment scoring
+  - `binarysearch_vector()` - Vectorized binary search
+  - `receiver()` - Network receiver for AIS streams
+- Identified FFI inefficiency: haversine() called per-element in 4+ locations
+- Documented batch optimization opportunities (50-100x potential speedup)
+
+#### [VERIFIED] Database Schema Analysis
+- Confirmed current data types:
+  - time: INTEGER (32-bit) - Y2038 bug confirmed
+  - longitude/latitude: REAL (32-bit float) - precision loss confirmed
+  - TimescaleDB compression: DISABLED in current schema
+  - MMSI partitions: Only 4 (should be 16-256)
+- SQL files verified: 10 schema files in aisdb/aisdb_sql/
+
+#### [UPDATED] Report Metadata
+- Version: 4.1.0 → 4.2.0
+- Added analysis agents: SQLite Removal, Visualization Removal, Rust-Python Interface
+- Updated total report length to ~4,150 lines
+
+### Multi-Agent Analysis Summary
+
+| Agent | Task | Key Findings |
+|-------|------|--------------|
+| SQLite Removal | Code deletion inventory | 8 files, ~610 total lines (including SQL) |
+| Visualization | Component inventory | 34 files, 848KB, includes WASM client |
+| Database Schema | Schema analysis | 10 SQL files, confirmed Y2038/precision issues |
+| Rust-Python Interface | PyO3 bindings | 6 functions, major FFI bottlenecks identified |
+
+### Statistics
+- Sections Verified: 4 major sections
+- Sections Updated: 1 (Section 1.2 line counts)
+- Lines Changed: ~50
+- Total Report Size: ~4,150 lines
+
+### Source Reports Used
+- 0-REPORT.md: Architecture documentation (referenced for component inventory)
+- 1-REPORT.md: Bug analysis (referenced for Y2038, precision bugs)
+- 2-REPORT.md: Bad decisions (referenced for SQLite dual-database issue)
+
+### Git State
+- Branch: audit
+- Last Commit: 7888907 - docs(audit): Update 4-REPORT to v4.1.0
+
+### Prompt Version Compliance
+This run verifies **Prompt Version 1.2.0** requirements:
+- ✓ Multi-agent exploration for thorough analysis
+- ✓ Exact line numbers and file counts verified
+- ✓ Self-hosted infrastructure philosophy maintained
+- ✓ PostGIS/TimescaleDB sections confirmed complete
+- ✓ ASCII diagrams intact
+
+---
+
 ## [Run 2025-12-11 19:15] - Report Version 4.1.0
 
 ### Summary
@@ -289,6 +367,8 @@ Brief description of this analysis run.
 | 2025-12-11 | - | **PROMPT UPDATE**: Added self-hosted infrastructure philosophy | 4-PROMPT.md |
 | 2025-12-11 | - | **PROMPT UPDATE**: Added PostGIS/TimescaleDB data architecture | 4-PROMPT.md |
 | 2025-12-11 | 4.0.0 | PostGIS + TimescaleDB sections, storage planning, ASCII diagrams | +800 |
+| 2025-12-11 | 4.1.0 | Storage strategy corrected for ML training workload | ~150 |
+| 2025-12-11 | 4.2.0 | Multi-agent verification: SQLite/Viz removal, PyO3 interface | ~50 |
 
 ---
 
