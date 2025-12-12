@@ -4,6 +4,71 @@ This file tracks all changes made to `3-REPORT.md` across successive cross-repor
 
 ---
 
+## [Run 2025-12-12 Fresh Analysis v6] - Report Version 1.6.0
+
+### Summary
+Executed comprehensive fresh unbiased analysis using 10 specialized agents. Verified 75+ file paths, 19 critical bug line numbers, and 17 major code snippets with 100% accuracy. Discovered two new quantitative contradictions and detected one regression in test function count.
+
+### Analysis Method
+- Fresh analysis completed: Yes
+- Existing 3-REPORT.md found: Yes (v1.5.0)
+- Merge performed: Yes
+- Analysis agents executed: 10
+
+### New Contradictions Found
+- [ADDITION] CONTRA-QT-012: Haversine bug scope overstated - only 1 of 5 call sites incorrect (proc_util.py:69)
+- [ADDITION] CONTRA-QT-013: PostgresDBConn method count: 0-REPORT claims "9 methods" but only 5 public methods exist
+
+### Regressions Detected
+- [REGRESSION] CONTRA-QT-007: Test function count reverted to 60 in 0-REPORT.md line 48 despite v1.4.0 correction to 56
+
+### Critical Claims Re-Verified Against Source Code (100% Accuracy)
+- [VERIFIED] SQL Injection (PYDB-001): `sql_query_strings.py:192-193` - CONFIRMED
+- [VERIFIED] Y2038 Bug (INT-001): i32 timestamps throughout - CONFIRMED
+- [VERIFIED] XSS (WEB-003): `map.js:386` via innerHTML - CONFIRMED
+- [VERIFIED] Haversine Swap (TRACK-002): `proc_util.py:69` (only incorrect location) - CONFIRMED
+- [VERIFIED] UPSERT Bug (SQL-001): `insert_webdata_marinetraffic.sql:24` - CONFIRMED
+- [VERIFIED] Comma Operator (WEB-001): `livestream.js:74` - CONFIRMED
+- [VERIFIED] Lat/Lon Swap (WEBDATA-001): `load_raster.py:61` - CONFIRMED
+- [VERIFIED] COG Type Mismatch (INT-028): `track_gen.py:73` uint32 instead of float32 - CONFIRMED
+
+### Accuracy Metrics
+- File paths verified: 75+ (100% accurate)
+- Line numbers verified: 19 critical bugs (100% exact match)
+- Code snippets verified: 17 major snippets (100% match)
+- FALSE POSITIVEs verified: 5 (all correctly marked)
+
+### Previous Findings Verified
+- [VERIFIED] All severity ratings consistent across reports
+- [VERIFIED] All false positives correctly marked
+- [VERIFIED CORRECTED] Weather mappings = 271, Test files = 19
+
+### Corrections Applied to Source Reports
+
+#### 0-REPORT.md
+- [CORRECTED] Line 48: "60 test functions" → "56 test functions" (CONTRA-QT-007 regression fix)
+
+#### 1-REPORT.md
+- No corrections required (TRACK-002 scope clarification is informational)
+
+#### 2-REPORT.md
+- No corrections required (severity recommendations are optional)
+
+### Statistics Update
+- Total Contradictions: 29 (was 27)
+- New This Run: 2
+- Verified (Still Present): 17
+- Resolved: 12
+- Regressions: 1
+- Reports Modified: 0-REPORT.md, 3-REPORT.md
+
+### Git State
+- Branch: audit
+- Last Commit: c2fb854 - docs: Automated audit run - 2025-12-12 00:46
+- Uncommitted Changes: Yes (audit reports)
+
+---
+
 ## [Run 2025-12-12 Fresh Analysis v5] - Report Version 1.5.0
 
 ### Summary

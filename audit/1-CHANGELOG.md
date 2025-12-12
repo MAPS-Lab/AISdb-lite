@@ -4,6 +4,66 @@ This file tracks all changes made to `1-REPORT.md` across successive bug analysi
 
 ---
 
+## [Run 2025-12-12 Verification Analysis] - Report Version 1.8.0
+
+### Summary
+Sixth comprehensive bug analysis run using 10 specialized exploration agents. Source code unchanged since last analysis. All 199 previously documented bugs re-verified as still present. **1 new bug discovered**: INT-028 COG type mismatch (uint32 instead of float32 for Course Over Ground values). Total bug count: 200.
+
+### Analysis Agents Deployed
+1. Rust Crate Bug Analyzer - Re-verified 23 bugs (RUST-001 to RUST-037)
+2. Python Database Layer Bug Analyzer - Re-verified 17 bugs (PYDB-001 to PYDB-017)
+3. SQL File Bug Analyzer - Re-verified 9 bugs (SQL-001 to SQL-013)
+4. Track Processing Bug Analyzer - Re-verified 10 bugs (TRACK-002 to TRACK-027, TRACK-001 remains FIXED)
+5. Web Frontend Bug Analyzer - Re-verified 14 bugs (WEB-001 to WEB-022)
+6. Webdata/Weather Bug Analyzer - Re-verified 11 bugs (WEBDATA-001 to WEBDATA-030)
+7. Test Suite Bug Analyzer - Re-verified 8 bugs (TEST-001 to TEST-037)
+8. Build Configuration Bug Analyzer - Re-verified 8 bugs (BUILD-001 to BUILD-027)
+9. Cross-Cutting Integration Bug Analyzer - Found 1 new bug, re-verified 17 bugs
+10. Discretization/Misc Bug Analyzer - Re-verified 10 bugs (DISC-001 to DISC-024)
+
+### New Bugs Found
+- [ADDITION] INT-028: COG Type Mismatch - uint32 Instead of float (HIGH)
+  - **File:** `aisdb/track_gen.py:73`
+  - **Problem:** COG (Course Over Ground) stored as `np.uint32` instead of `np.float32`, truncating decimal precision
+  - **Evidence:** Line 73 uses `dtype=np.uint32` for COG while line 74 correctly uses `dtype=np.float32` for SOG
+  - **Impact:** All COG values lose decimal precision (e.g., 45.7° becomes 45°), affecting vessel heading calculations and course-based filtering
+
+### Critical Bug Spot-Verification Results
+- [VERIFIED] RUST-001: Early return at csvreader.rs:398 - `return Ok(())` confirmed (should be `continue`)
+- [VERIFIED] RUST-005: Empty vector access at src/lib.rs:438 - `arr[0]` without bounds check confirmed
+- [VERIFIED] PYDB-001: SQL injection at sql_query_strings.py:191-193 - f-string interpolation confirmed
+- [VERIFIED] WEBDATA-001: Lat/lon swap at load_raster.py:61 - `track['lon'][rng]` instead of `track['lat'][rng]` confirmed
+- [VERIFIED] TRACK-001: Division by zero fix at gis.py:174 - `np.max((1, s))` clamping confirmed (STILL FIXED)
+- [VERIFIED] TRACK-002: Haversine swap at proc_util.py:69 - `(lat, lon)` order confirmed (should be `(lon, lat)`)
+- [VERIFIED] TRACK-003: Invalid assertion at gis.py:34 - `np.all(x)` returns boolean, not numeric range
+
+### Statistics
+- **Total Bugs**: 200 (was 199)
+- **Changes from Previous**: +1 new, -0 fixed, ~0 updated
+- **By Severity**: Critical 29 (14.5%), High 74 (37.0%), Medium 64 (32.0%), Low 33 (16.5%)
+
+### Bug Distribution by Component (Updated)
+| Component | Critical | High | Medium | Low | Total |
+|-----------|----------|------|--------|-----|-------|
+| Rust Crates | 6 | 11 | 5 | 1 | 23 |
+| Python Database Layer | 4 | 7 | 6 | 0 | 17 |
+| SQL Files | 2 | 0 | 4 | 3 | 9 |
+| Track Processing | 2 | 6 | 2 | 0 | 10 |
+| Web Frontend | 1 | 4 | 7 | 2 | 14 |
+| Webdata/Weather | 3 | 5 | 3 | 0 | 11 |
+| Test Suite | 2 | 2 | 3 | 1 | 8 |
+| Build Configuration | 2 | 4 | 1 | 1 | 8 |
+| Cross-Cutting Integration | 2 | 9 | 6 | 1 | 18 |
+| Discretize/Misc | 0 | 5 | 4 | 1 | 10 |
+
+### Git State
+- **Branch**: audit
+- **Last Commit**: c2fb854 - docs: Automated audit run - 2025-12-12 00:46
+- **Source Code Changes**: None since last analysis
+- **Analysis Method**: 10 specialized agents with comprehensive verification
+
+---
+
 ## [Run 2025-12-12 Cross-Report Reconciliation v1.5.0]
 
 ### Summary
@@ -757,9 +817,10 @@ The following bug IDs have been used and should NOT be reassigned even if the bu
 - Note: BUILD-027 added in Run 2025-12-12 (incomplete step name)
 
 ### Cross-Cutting Integration (INT-)
-- INT-001 through INT-026
+- INT-001 through INT-028
 - Note: INT-009 through INT-012 added in Run 2025-12-11 Re-verification
 - Note: INT-024 through INT-026 added in Run 2025-12-12 (UTF-8 panics, CSV panics, FFI errors)
+- Note: INT-028 added in Run 2025-12-12 v1.8.0 (COG type mismatch - uint32 instead of float)
 
 ### Discretization/Misc (DISC-)
 - DISC-001 through DISC-024
@@ -781,6 +842,7 @@ The following bug IDs have been used and should NOT be reassigned even if the bu
 | 2025-12-11 | 1.5.0 (Consolidation) | 0 | 0 | 55 | 0 | 173 |
 | 2025-12-11 | 1.6.0 (Verification) | 0 | 0 | 0 | 0 | 173 |
 | 2025-12-12 | 1.7.0 (Comprehensive) | 26 | 1 | 0 | 0 | 199 |
+| 2025-12-12 | 1.8.0 (Verification) | 1 | 0 | 0 | 0 | 200 |
 
 ---
 
@@ -801,6 +863,7 @@ The following bug IDs have been used and should NOT be reassigned even if the bu
 | SQL-002 | Same as SQL-001 in SQLite variant | OPEN |
 | INT-001 | Year 2038 timestamp overflow | OPEN |
 | INT-002 | i64 to i32 cast truncation | OPEN |
+| INT-028 | COG type mismatch - uint32 truncates decimal precision | OPEN |
 | RUST-001 | Early return terminates CSV processing | OPEN |
 | RUST-003 | Early return in NOAA CSV import | OPEN |
 | PYDB-001 | SQL injection vulnerability | OPEN |

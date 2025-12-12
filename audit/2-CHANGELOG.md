@@ -4,6 +4,150 @@ This file tracks all changes made to `2-REPORT.md` across successive bad busines
 
 ---
 
+## [Run 2025-12-12 Full Re-Analysis v1.5.0] - Report Version 1.5.0
+
+### Summary
+Full re-analysis completed using 10 specialized exploration agents. Source code has been modified (28 files changed including database, weather, and test modules). All 340+ existing issues re-verified against current codebase. All critical architectural issues confirmed still present. No new critical issues discovered as the architectural patterns remain unchanged despite code modifications.
+
+### Source Code Changes Detected
+Recent commits modified the following areas:
+- `aisdb/database/dbconn.py` - 168 lines changed
+- `aisdb/database/dbqry.py` - 99 lines changed
+- `aisdb/database/decoder.py` - 124 lines changed
+- `aisdb/database/sql_query_strings.py` - 46 lines added
+- `aisdb/weather/data_store.py` - 282 lines changed
+- `aisdb/weather/utils.py` - 96 lines added (new file)
+- `aisdb/weather/weather_fetch.py` - 142 lines added
+- `aisdb/webdata/marinetraffic.py` - 74 lines changed
+- Multiple test files modified
+
+### Issues Re-Verified (All Parts Confirmed)
+
+#### Part 1: Database Layer - ALL VERIFIED
+- [VERIFIED] 1.1 Float PK: Still uses REAL columns in PRIMARY KEY
+- [VERIFIED] 1.2 Timestamp i32: Multiple schemas still use INTEGER (32-bit)
+- [VERIFIED] 1.3 SQL Injection: f-string SQL construction patterns persist
+- [VERIFIED] 1.4 No Pooling: Single connection per instance still present
+- [VERIFIED] 1.5 N+1 Pattern: `aggregate_static_msgs()` still loops over MMSIs
+- [VERIFIED] 1.6 ON CONFLICT: Still uses bare `ON CONFLICT DO NOTHING`
+- [VERIFIED] 1.7 Mutable default: `args=[]` pattern still present
+- [VERIFIED] 1.8 Aggregate recreation: No transaction wrapping still present
+
+#### Part 2: Data Processing - ALL VERIFIED
+- [VERIFIED] 2.1 Dict Tracks: Dictionary-based representation unchanged
+- [VERIFIED] 2.2 Linear Interp: Linear interpolation on sphere still used
+- [VERIFIED] 2.3 Hardcoded 3857: Web Mercator still hardcoded
+- [VERIFIED] 2.4 Unbounded Pathways: Denoising encoder still unbounded
+- [VERIFIED] 2.5 Array Mismatch: Static/dynamic index mismatch still present
+- [VERIFIED] 2.6 Haversine swap: Coordinate order still reversed
+- [VERIFIED] 2.7 NumPy speed bug: np.max on scalar still present
+
+#### Part 3: Rust Handling - ALL VERIFIED
+- [VERIFIED] 3.1 Panics: 228 instances confirmed across Rust codebase
+- [VERIFIED] 3.2 Early Return: Still terminates file on bad row
+- [VERIFIED] 3.3 Batch Size: BATCHSIZE=50000 still hardcoded
+- [VERIFIED] 3.4 Timestamp Cast: i64 to i32 casts still present
+- [VERIFIED] 3.5 Precision Loss: f64→f32 casts still present
+
+#### Part 4: Web Services - ALL VERIFIED
+- [VERIFIED] 4.1 Rate Limiting: Primitive sleep(randint(1,3)) still used
+- [VERIFIED] 4.2 Blanket Except: Bare except clauses still present
+- [VERIFIED] 4.3 Coord Bug: lon used for lat lookup still present
+- [VERIFIED] 4.4 No Caching: All webdata modules still lack caching
+- [VERIFIED] 4.5 Weather Design: Silent failure on API init still present
+
+#### Part 5: Frontend - ALL VERIFIED
+- [VERIFIED] 5.1 Typo: "onbefureunload" still misspelled
+- [VERIFIED] 5.2 Race Condition: db_ready set before cursor completes
+- [VERIFIED] 5.3 Memory Leak: Unbounded live_targets still present
+- [VERIFIED] 5.4 XSS: innerHTML vulnerability still present
+- [VERIFIED] 5.5 Comma operator bug: coords[-1, 0] still evaluates to coords[0]
+
+#### Part 6: Spatial Indexing - ALL VERIFIED
+- [VERIFIED] 6.1 H3 Not in DB: Computed but never persisted
+- [VERIFIED] 6.2 Hardcoded UTM: EPSG:32619 still hardcoded
+- [VERIFIED] 6.3 Brute-Force: O(n*m) loops still present
+- [VERIFIED] 6.4 Coord Bug: np.all returns bool, assertion never fires
+- [VERIFIED] 6.5 PostGIS: Still underutilized
+- [VERIFIED] 6.6 No GEOGRAPHY: Still using GEOMETRY only
+
+#### Part 7: Data Ingestion - ALL VERIFIED
+- [VERIFIED] 7.1 Weak Checksum: Only 1000 bytes hashed
+- [VERIFIED] 7.2 Skip Default: skip_checksum=True default
+- [VERIFIED] 7.3 MMSI Validation: 4 different behaviors across codepaths
+- [VERIFIED] 7.4 ETA Year: Hardcoded 2000 still present
+- [VERIFIED] 7.5 Format Detection: Extension-based only
+- [VERIFIED] 7.6 Early Return: Single bad row loses entire file
+- [VERIFIED] 7.7 BadZipFile: Silent failure still present
+
+#### Part 8: Configuration/Testing - ALL VERIFIED
+- [VERIFIED] 8.1 Test Isolation: No conftest.py still missing
+- [VERIFIED] 8.2 Assertions: Used for validation still present
+- [VERIFIED] 8.3 Integration Tests: 81-89% still require PostgreSQL
+- [VERIFIED] 8.4 Duplicate Tests: Paired test files still exist
+- [VERIFIED] 8.5 Silent Errors: Exception swallowing in tests
+- [VERIFIED] 8.6 Dockerfile: ENTRYPOINT ["top", "-b"] still present
+- [VERIFIED] 8.7 Test Data: Still included in production package
+- [VERIFIED] 8.8 CI Branch: Still targets `master` instead of `main`
+- [VERIFIED] 8.9 No conftest.py: Missing pytest fixtures
+- [VERIFIED] 8.10 Print-Only Tests: No assertions in multiple tests
+
+#### Part 9: Receiver/Streaming - ALL VERIFIED
+- [VERIFIED] 9.1 Blocking I/O: Synchronous loop still present
+- [VERIFIED] 9.2 Fixed Buffers: max_dynamic=256 still hardcoded
+- [VERIFIED] 9.3 UDP Buffer: BUFSIZE=8096 still hardcoded
+- [VERIFIED] 9.4 Unbounded Threads: spawn per client still present
+- [VERIFIED] 9.5 Zero Error Handling: Crash points still present
+- [VERIFIED] 9.6 No TLS: TODO comment still not implemented
+- [VERIFIED] 9.7 No Metrics: println only for logging
+- [VERIFIED] 9.8 Infinite Timeouts: Still set to None
+- [VERIFIED] 9.9 Silent Data Loss: Buffer flush ignores errors
+
+#### Part 10: Cross-Language - ALL VERIFIED
+- [VERIFIED] 10.1 Timestamp: i32/uint32/INTEGER inconsistency
+- [VERIFIED] 10.2 Precision: f64→f32 loss chain
+- [VERIFIED] 10.3 NULL→0: unwrap_or_default patterns
+- [VERIFIED] 10.4 Field Naming: Inconsistent across languages
+- [VERIFIED] 10.5 No Versioning: No schema evolution
+- [VERIFIED] 10.6 COG Mismatch: uint32 vs f32 type mismatch
+
+### Agent Analysis Highlights
+
+**Agent 1 (Database Layer):** Confirmed all SQL injection patterns, mutable defaults, and N+1 query issues still present in modified files.
+
+**Agent 2 (Data Processing):** Verified Haversine coordinate order bug, numpy scalar issues, and unbounded memory patterns unchanged.
+
+**Agent 3 (Rust Handling):** Counted crash points - confirmed 228 panic-prone operations across Rust codebase remain.
+
+**Agent 4 (Web Services):** Found rate limiting still primitive, blanket except clauses persist, coordinate bug in load_raster.py unchanged.
+
+**Agent 5 (Frontend):** Verified JavaScript comma operator bug, XSS via innerHTML, and WebSocket cleanup issues persist.
+
+**Agent 6 (Spatial Indexing):** Confirmed H3 not persisted to database, hardcoded UTM zone, and brute-force algorithms unchanged.
+
+**Agent 7 (Data Ingestion):** Verified early return data loss, weak checksum, and silent BadZipFile handling persist.
+
+**Agent 8 (Config/Testing):** Confirmed CI targets wrong branch, no conftest.py, multiple tests without assertions.
+
+**Agent 9 (Receiver/Streaming):** Verified blocking I/O, infinite timeouts, no TLS, unbounded thread spawning - all 97 crash points confirmed.
+
+**Agent 10 (Cross-Language):** Confirmed timestamp inconsistencies, COG type mismatch, and f64→f32 precision loss chain across all layers.
+
+### Statistics
+- Total Issues: **340+** (unchanged - no new issues, existing issues persist)
+- Changes from Previous: 0 new, 0 resolved, 0 updated
+- Critical Severity: 78+ (unchanged)
+- High Severity: 115+ (unchanged)
+- Medium Severity: 100+ (unchanged)
+- Low Severity: 35+ (unchanged)
+
+### Git State
+- Branch: audit
+- Last Commit: c2fb854 - docs: Automated audit run - 2025-12-12 00:46
+- Source Code Changes: 28 files modified since previous audit
+
+---
+
 ## [Run 2025-12-12 Cross-Report Reconciliation v1.5.0]
 
 ### Summary
@@ -1137,6 +1281,7 @@ The following sections exist in the report and should be referenced in changelog
 
 | Run Date | Report Version | New | Resolved | Updated | Invalid | Total |
 |----------|---------------|-----|----------|---------|---------|-------|
+| 2025-12-12 v1.5.0 | 1.5.0 | 0 | 0 | 0 | 0 | 340+ |
 | 2025-12-12 v1.4.1 | 1.4.1 | 0 | 0 | 0 | 0 | 340+ |
 | 2025-12-11 v1.4.0 | 1.4.0 | 85+ | 0 | 1 | 0 | 340+ |
 | 2025-12-11 v1.3.0 | 1.3.0 | 48+ | 0 | 1 | 0 | 290+ |

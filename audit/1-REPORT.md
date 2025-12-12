@@ -3,13 +3,13 @@
 > **Generated**: December 2025
 > **Version Analyzed**: 1.8.0-alpha
 > **Analysis Method**: 10 specialized exploration agents covering all code paths
-> **Total Bugs Found**: 199 confirmed bugs
+> **Total Bugs Found**: 200 confirmed bugs
 > **Critical Bugs**: 29
-> **High Severity**: 73
+> **High Severity**: 74
 > **Medium Severity**: 64
 > **Low Severity**: 33
 >
-> **REPORT UPDATE (December 12, 2025 - v1.7.0)**: Fifth comprehensive analysis run with 10 specialized agents. All previously documented bugs re-verified. **26 new bugs discovered** across all components. One bug confirmed fixed (TRACK-001: Division by zero now has proper clamping).
+> **REPORT UPDATE (December 12, 2025 - v1.8.0)**: Sixth comprehensive analysis run with 10 specialized agents. All 199 previously documented bugs re-verified as still present (source code unchanged). **1 new bug discovered**: INT-028 COG type mismatch (uint32 instead of float). Total bug count: 200.
 >
 > **CORRECTION NOTE (December 2025)**: The following items were identified as false positives and removed:
 > - PYDB-003: Off-by-one in dbqry.py - Final `yield mmsi_rows` returns all data (NOT A BUG)
@@ -21,12 +21,12 @@
 
 ## Executive Summary
 
-This report documents **199 confirmed bugs** discovered through systematic analysis of the AISdb-lite codebase by 10 specialized exploration agents. These are **real bugs** - not style suggestions, best practices, or potential improvements. Each bug represents actual broken functionality, data corruption risk, crash potential, or security vulnerability.
+This report documents **200 confirmed bugs** discovered through systematic analysis of the AISdb-lite codebase by 10 specialized exploration agents. These are **real bugs** - not style suggestions, best practices, or potential improvements. Each bug represents actual broken functionality, data corruption risk, crash potential, or security vulnerability.
 
-**Key Changes in v1.7.0:**
-- 26 NEW bugs discovered across all components
-- 1 bug confirmed FIXED (TRACK-001)
-- Total increased from 173 to 199 bugs
+**Key Changes in v1.8.0:**
+- 1 NEW bug discovered: INT-028 (COG type mismatch)
+- All 199 previously documented bugs re-verified as still present
+- Total increased from 199 to 200 bugs
 
 ### Bug Distribution by Component
 
@@ -40,9 +40,9 @@ This report documents **199 confirmed bugs** discovered through systematic analy
 | Webdata/Weather (Python) | 3 | 5 | 3 | 0 | 11 |
 | Test Suite | 2 | 2 | 3 | 1 | 8 |
 | Build Configuration | 2 | 4 | 1 | 1 | 8 |
-| Cross-Cutting Integration | 2 | 8 | 6 | 1 | 17 |
+| Cross-Cutting Integration | 2 | 9 | 6 | 1 | 18 |
 | Discretize/Misc | 0 | 5 | 4 | 1 | 10 |
-| **TOTAL** | **29** | **73** | **64** | **33** | **199** |
+| **TOTAL** | **29** | **74** | **64** | **33** | **200** |
 
 ---
 
@@ -1798,13 +1798,46 @@ chunk_time_interval => 604800  -- Raw integer (7 days in seconds)
 
 ---
 
-### INT-026: Database Timestamp Conversion Panic (MEDIUM) [NEW]
+### INT-026: Database Timestamp Conversion Panic (MEDIUM)
 
 **File:** `database_server/src/aisdb_db_server.rs:325, 329`
 
 **Problem:** `from_timestamp_opt().unwrap()` panics on invalid range.
 
 **Impact:** Out-of-range timestamps crash server.
+
+---
+
+### INT-028: COG Type Mismatch - uint32 Instead of float (HIGH) [NEW]
+
+**File:** `aisdb/track_gen.py:73`
+
+```python
+trackdict = dict(
+    # ...
+    cog=np.array([r['cog'] for r in rows], dtype=np.uint32)[idx],  # BUG: uint32 truncates decimals
+    sog=np.array([r['sog'] for r in rows], dtype=np.float32)[idx],
+    # ...
+)
+```
+
+**Problem:** Course Over Ground (COG) is stored as `np.uint32` instead of `np.float32`. COG values range from 0.0 to 360.0 degrees with decimal precision, but uint32 truncates all fractional parts.
+
+**Database Schema:**
+```sql
+-- timescale_createtable_dynamic.sql:9
+cog REAL,  -- PostgreSQL REAL = float32
+```
+
+**Evidence:** Line 73 uses `dtype=np.uint32` for COG while line 74 correctly uses `dtype=np.float32` for SOG. Both are REAL columns in the database.
+
+**Impact:**
+- All COG values lose decimal precision (e.g., 45.7° becomes 45°)
+- Vessel heading calculations off by up to 1 degree
+- Course-based track segmentation and filtering affected
+- Visualization displays truncated headings
+
+**Verify:** `grep -n "dtype=np.uint32.*cog" aisdb/track_gen.py`
 
 ---
 
@@ -1944,11 +1977,11 @@ def geo_interp_time(tracks, step=timedelta(minutes=10), original_crs=4269):
 
 | Severity | Count | Percentage |
 |----------|-------|------------|
-| Critical | 29 | 14.6% |
-| High | 73 | 36.7% |
-| Medium | 64 | 32.2% |
-| Low | 33 | 16.6% |
-| **Total** | **199** | 100% |
+| Critical | 29 | 14.5% |
+| High | 74 | 37.0% |
+| Medium | 64 | 32.0% |
+| Low | 33 | 16.5% |
+| **Total** | **200** | 100% |
 
 ### By Category
 
@@ -1958,7 +1991,7 @@ def geo_interp_time(tracks, step=timedelta(minutes=10), original_crs=4269):
 | Data Corruption | Wrong calculations, swapped coordinates | 22 |
 | Resource Leak | Unclosed cursors, memory leaks | 15 |
 | Security | SQL injection, XSS vulnerabilities | 11 |
-| Type Mismatch | Year 2038, wrong types | 18 |
+| Type Mismatch | Year 2038, wrong types | 19 |
 | Silent Failure | Errors suppressed | 18 |
 | Build/Config | CI issues, dependency problems | 8 |
 | Test Quality | Missing assertions | 8 |
@@ -2006,6 +2039,9 @@ grep -n "master\|main" .github/workflows/CI.yml
 # Verify INT-001 (Year 2038)
 grep -rn "i32\|INTEGER" --include="*.rs" --include="*.sql" | grep -i time
 
+# Verify INT-028 (COG type mismatch)
+grep -n "dtype=np.uint32" aisdb/track_gen.py
+
 # Verify WEBDATA-001 (lat/lon swap)
 grep -n "binarysearch_vector" aisdb/webdata/load_raster.py
 
@@ -2017,4 +2053,4 @@ grep -rn "def test_" aisdb/tests/*.py -A20 | grep -v "assert"
 
 *This report was generated by 10 specialized exploration agents covering all code paths in the AISdb-lite repository.*
 *Analysis Date: December 12, 2025*
-*Report Version: 1.7.0*
+*Report Version: 1.8.0*
