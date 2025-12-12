@@ -4,6 +4,48 @@ This file tracks all changes made to `3-REPORT.md` across successive cross-repor
 
 ---
 
+## [Run 2025-12-12 Fresh Analysis v5] - Report Version 1.5.0
+
+### Summary
+Executed fresh unbiased analysis using 10 specialized agents. Discovered three new quantitative contradictions related to panic counts, Python file counts, and Rust file counts. All critical claims (SQL injection, Y2038, XSS, haversine swap, UPSERT bug, comma operator) re-verified against source code. All previous findings verified as still valid or corrected.
+
+### Analysis Method
+- Fresh analysis completed: Yes
+- Existing 3-REPORT.md found: Yes (v1.4.0)
+- Merge performed: Yes
+- Analysis agents executed: 10
+
+### New Contradictions Found
+- [ADDITION] CONTRA-QT-009: Panic count in 2-REPORT is 228, but actual grep shows 272 (183 unwrap + 68 expect + 21 panic)
+- [ADDITION] CONTRA-QT-010: Python file count may be understated (0-REPORT may claim 47, actual is 58)
+- [ADDITION] CONTRA-QT-011: Rust file count may be understated (0-REPORT may claim 11, actual is 15)
+
+### Critical Claims Re-Verified Against Source Code
+- [VERIFIED] SQL Injection (PYDB-001): `sql_query_strings.py:192-193` - f-string interpolation of polygon_wkt confirmed
+- [VERIFIED] Y2038 Bug (INT-001): `encoder_score_fcn` uses `t1: i32, t2: i32` parameters; database schema uses INTEGER
+- [VERIFIED] XSS (WEB-003): `map.js:386` - `innerHTML = vinfo.meta_string` without sanitization confirmed
+- [VERIFIED] Haversine Swap (TRACK-002): `proc_util.py:69` - passes (lat, lon) where (lon, lat) expected confirmed
+- [VERIFIED] UPSERT Bug (SQL-001): `insert_webdata_marinetraffic.sql:24` - `summer_dwt = excluded.gross_tonnage` confirmed
+- [VERIFIED] Comma Operator (WEB-001): `livestream.js:74` - `coords[-1, 0]` evaluates to `coords[0]` confirmed
+
+### Previous Findings Verified
+- [VERIFIED] CONTRA-SV-002: Severity mismatch - still present (1-REPORT=CRITICAL, 2-REPORT=High)
+- [VERIFIED] CONTRA-ST-005: SQLiteDBConn remnant at decoder.py:253 - still present
+- [VERIFIED CORRECTED] CONTRA-QT-007: Test function count now shows 56 in 0-REPORT.md
+- [VERIFIED] CONTRA-QT-008: Bug count methodology (98 vs 173) - documentation clarification noted
+
+### Regressions Detected
+None
+
+### Statistics Update
+- Total Contradictions: 27 (was 24)
+- New This Run: 3
+- Verified (Still Present): 14
+- Resolved: 10
+- Regressions: 0
+
+---
+
 ## [Run 2025-12-11 Fresh Analysis v4] - Report Version 1.4.0
 
 ### Summary

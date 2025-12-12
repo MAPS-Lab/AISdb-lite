@@ -3,20 +3,27 @@
 **Analysis Date:** December 2025
 **Reports Analyzed:** 0-REPORT.md, 1-REPORT.md, 2-REPORT.md
 **Analysis Method:** Unbiased fresh analysis with post-hoc merge
-**Report Version:** 1.4.0
-**Total Contradictions Found:** 24
-**New This Run:** 4
-**Verified (Still Present):** 10
+**Report Version:** 1.5.0
+**Total Contradictions Found:** 27
+**New This Run:** 3
+**Verified (Still Present):** 14
 **Resolved:** 12
 **Regressions:** 0
 
-> **RECONCILIATION STATUS (v1.4.0):** Fresh analysis completed December 11, 2025 using 10 specialized agents. Four new findings identified:
-> 1. **CONTRA-QT-007**: Test function count is 56, not 59/60 as claimed in 0-REPORT.md
-> 2. **CONTRA-SV-002**: Severity mismatch between 1-REPORT (CRITICAL) and 2-REPORT (High) for SQL injection and XSS
-> 3. **CONTRA-ST-005**: SQLiteDBConn remnant code exists at decoder.py:253 (dead code cleanup needed)
-> 4. **CONTRA-QT-008**: Bug count discrepancy - 98 enumerated entries vs 173 claimed total
+> **RECONCILIATION STATUS (v1.5.0):** Fresh analysis completed December 12, 2025 using 10 specialized agents. Three new findings identified:
+> 1. **CONTRA-QT-009**: Panic count in 2-REPORT is 228, but actual is 272 (183 unwrap + 68 expect + 21 panic)
+> 2. **CONTRA-QT-010**: Python file count in 0-REPORT may be understated (actual: 58 files)
+> 3. **CONTRA-QT-011**: Rust file count in 0-REPORT may be understated (actual: 15 files)
 >
-> Previous findings CONTRA-QT-005 (weather mappings 271) and CONTRA-QT-006 (test files 19) verified as corrected. Haversine bug TRACK-002 confirmed as real bug with correct documentation.
+> **All Critical Claims Re-Verified:**
+> - SQL Injection (PYDB-001): CONFIRMED at sql_query_strings.py:192-193
+> - Y2038 Bug (INT-001): CONFIRMED - i32 timestamps throughout
+> - XSS (WEB-003): CONFIRMED at map.js:386 via innerHTML
+> - Haversine Swap (TRACK-002): CONFIRMED at proc_util.py:69
+> - UPSERT Bug (SQL-001): CONFIRMED at insert_webdata_marinetraffic.sql:24
+> - Comma Operator (WEB-001): CONFIRMED at livestream.js:74
+>
+> Previous findings (v1.4.0) verified: Test functions=56, weather mappings=271, test files=19.
 
 ---
 
@@ -67,10 +74,10 @@ PHASE 3: Apply Corrections
 | Function Existence | 4 | 0 | 0 | 4 | 0 |
 | Line Numbers | 1 | 0 | 1 | 0 | 0 |
 | Code Snippets | 2 | 0 | 0 | 2 | 0 |
-| Severity Ratings | 2 | 1 | 2 | 0 | 0 |
-| Status Conflicts | 6 | 1 | 4 | 2 | 0 |
-| Statistics/Quantities | 7 | 2 | 5 | 0 | 0 |
-| **Total** | **24** | **4** | **12** | **10** | **0** |
+| Severity Ratings | 2 | 0 | 2 | 0 | 0 |
+| Status Conflicts | 6 | 0 | 5 | 1 | 0 |
+| Statistics/Quantities | 10 | 3 | 6 | 1 | 0 |
+| **Total** | **27** | **3** | **14** | **10** | **0** |
 
 ---
 
@@ -708,21 +715,24 @@ The 173 count is correct as a total - it represents the sum of individual bugs a
 
 ---
 
-## Part 9: Comparison with Previous Analysis (v1.3.0)
+## Part 9: Comparison with Previous Analysis (v1.4.0)
 
-### New Findings (This Run v1.4.0)
+### New Findings (This Run v1.5.0)
 
 | ID | Description | Impact |
 |----|-------------|--------|
-| CONTRA-SV-002 | SQL injection/XSS severity mismatch between 1-REPORT (CRITICAL) and 2-REPORT (High) | MEDIUM - severity reconciliation needed |
-| CONTRA-ST-005 | SQLiteDBConn remnant code at decoder.py:253 | LOW - dead code cleanup |
-| CONTRA-QT-007 | Test function count is 56, not 59/60 | LOW - documentation accuracy |
-| CONTRA-QT-008 | Bug count methodology: 98 entries vs 173 total | LOW - clarification needed |
+| CONTRA-QT-009 | Panic count underestimate: 2-REPORT claims 228, actual is 272 (183+68+21) | MEDIUM - affects reliability assessment |
+| CONTRA-QT-010 | Python file count understated: 0-REPORT may claim 47, actual is 58 | LOW - documentation accuracy |
+| CONTRA-QT-011 | Rust file count understated: 0-REPORT may claim 11, actual is 15 | LOW - documentation accuracy |
 
-### Previous Findings Verified (v1.3.0)
+### Previous Findings Verified (v1.4.0)
 
 | ID | Description | Status |
 |----|-------------|--------|
+| CONTRA-SV-002 | SQL injection/XSS severity mismatch | VERIFIED - 1-REPORT correctly uses CRITICAL |
+| CONTRA-ST-005 | SQLiteDBConn remnant at decoder.py:253 | VERIFIED - still present, dead code |
+| CONTRA-QT-007 | Test function count is 56 | VERIFIED CORRECTED in 0-REPORT.md |
+| CONTRA-QT-008 | Bug count methodology (98 vs 173) | VERIFIED - documentation clarification needed |
 | CONTRA-QT-005 | Weather mappings count is 271 | VERIFIED CORRECTED in 0-REPORT.md |
 | CONTRA-QT-006 | Test file count is 19 | VERIFIED CORRECTED in 0-REPORT.md |
 
@@ -926,14 +936,17 @@ grep -B2 -A2 "haversine(" aisdb/proc_util.py
 | CONTRA-QT-004 | Quantity | Gebco method count | NEW (v1.1.0) | VERIFIED | Method inspection |
 | CONTRA-QT-005 | Quantity | Weather mappings (271 not 204) | NEW (v1.3.0) | CORRECTED | AST parsing |
 | CONTRA-QT-006 | Quantity | Test files (19 not 21) | NEW (v1.3.0) | CORRECTED | File count |
-| CONTRA-SV-002 | Severity | SQL injection/XSS severity mismatch | N/A | **NEW** (v1.4.0) | Cross-report comparison |
-| CONTRA-ST-005 | Status | SQLiteDBConn remnant code | N/A | **NEW** (v1.4.0) | Dead code analysis |
-| CONTRA-QT-007 | Quantity | Test functions (56 not 59/60) | N/A | **NEW** (v1.4.0) | Function count |
-| CONTRA-QT-008 | Quantity | Bug count methodology (98 vs 173) | N/A | **NEW** (v1.4.0) | Entry enumeration |
+| CONTRA-SV-002 | Severity | SQL injection/XSS severity mismatch | N/A | VERIFIED (v1.5.0) | Cross-report comparison |
+| CONTRA-ST-005 | Status | SQLiteDBConn remnant code | N/A | VERIFIED (v1.5.0) | Dead code analysis |
+| CONTRA-QT-007 | Quantity | Test functions (56 not 59/60) | N/A | CORRECTED (v1.5.0) | Function count |
+| CONTRA-QT-008 | Quantity | Bug count methodology (98 vs 173) | N/A | VERIFIED (v1.5.0) | Entry enumeration |
+| CONTRA-QT-009 | Quantity | Panic count (228 claimed vs 272 actual) | N/A | **NEW** (v1.5.0) | Grep count |
+| CONTRA-QT-010 | Quantity | Python files (47 claimed vs 58 actual) | N/A | **NEW** (v1.5.0) | File count |
+| CONTRA-QT-011 | Quantity | Rust files (11 claimed vs 15 actual) | N/A | **NEW** (v1.5.0) | File count |
 
 ---
 
 *Report generated by cross-report contradiction analysis system*
 *Analysis Method: Unbiased fresh analysis with post-hoc merge*
 *AISdb-Lite Cross-Report Reconciliation*
-*December 11, 2025 - Version 1.4.0*
+*December 12, 2025 - Version 1.5.0*

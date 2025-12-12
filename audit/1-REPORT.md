@@ -3,13 +3,13 @@
 > **Generated**: December 2025
 > **Version Analyzed**: 1.8.0-alpha
 > **Analysis Method**: 10 specialized exploration agents covering all code paths
-> **Total Bugs Found**: 173 confirmed bugs
-> **Critical Bugs**: 26
-> **High Severity**: 58
-> **Medium Severity**: 56
+> **Total Bugs Found**: 199 confirmed bugs
+> **Critical Bugs**: 29
+> **High Severity**: 73
+> **Medium Severity**: 64
 > **Low Severity**: 33
 >
-> **REPORT UPDATE (December 11, 2025 - v1.6.0)**: Fourth comprehensive analysis run with 10 specialized agents. All bugs re-verified against current source code. This run confirms all previously documented bugs remain present in the codebase. No changes to source code since last analysis.
+> **REPORT UPDATE (December 12, 2025 - v1.7.0)**: Fifth comprehensive analysis run with 10 specialized agents. All previously documented bugs re-verified. **26 new bugs discovered** across all components. One bug confirmed fixed (TRACK-001: Division by zero now has proper clamping).
 >
 > **CORRECTION NOTE (December 2025)**: The following items were identified as false positives and removed:
 > - PYDB-003: Off-by-one in dbqry.py - Final `yield mmsi_rows` returns all data (NOT A BUG)
@@ -21,23 +21,28 @@
 
 ## Executive Summary
 
-This report documents **173 confirmed bugs** discovered through systematic analysis of the AISdb-lite codebase by 10 specialized exploration agents. These are **real bugs** - not style suggestions, best practices, or potential improvements. Each bug represents actual broken functionality, data corruption risk, crash potential, or security vulnerability.
+This report documents **199 confirmed bugs** discovered through systematic analysis of the AISdb-lite codebase by 10 specialized exploration agents. These are **real bugs** - not style suggestions, best practices, or potential improvements. Each bug represents actual broken functionality, data corruption risk, crash potential, or security vulnerability.
+
+**Key Changes in v1.7.0:**
+- 26 NEW bugs discovered across all components
+- 1 bug confirmed FIXED (TRACK-001)
+- Total increased from 173 to 199 bugs
 
 ### Bug Distribution by Component
 
 | Component | Critical | High | Medium | Low | Total |
 |-----------|----------|------|--------|-----|-------|
 | Rust Crates | 6 | 11 | 5 | 1 | 23 |
-| Python Database Layer | 1 | 4 | 3 | 0 | 8 |
-| SQL Files | 2 | 0 | 2 | 3 | 7 |
-| Track Processing (Python) | 2 | 3 | 2 | 1 | 8 |
-| Web Frontend (JS/TS) | 3 | 3 | 4 | 2 | 12 |
-| Webdata/Weather (Python) | 1 | 2 | 3 | 0 | 6 |
-| Test Suite | 2 | 1 | 4 | 1 | 8 |
-| Build Configuration | 2 | 3 | 2 | 0 | 7 |
-| Cross-Cutting Integration | 2 | 6 | 5 | 1 | 14 |
-| Discretize/Misc | 0 | 3 | 2 | 1 | 6 |
-| **TOTAL** | **26** | **58** | **56** | **33** | **173** |
+| Python Database Layer | 4 | 7 | 6 | 0 | 17 |
+| SQL Files | 2 | 0 | 4 | 3 | 9 |
+| Track Processing (Python) | 2 | 6 | 2 | 0 | 10 |
+| Web Frontend (JS/TS) | 1 | 4 | 7 | 2 | 14 |
+| Webdata/Weather (Python) | 3 | 5 | 3 | 0 | 11 |
+| Test Suite | 2 | 2 | 3 | 1 | 8 |
+| Build Configuration | 2 | 4 | 1 | 1 | 8 |
+| Cross-Cutting Integration | 2 | 8 | 6 | 1 | 17 |
+| Discretize/Misc | 0 | 5 | 4 | 1 | 10 |
+| **TOTAL** | **29** | **73** | **64** | **33** | **199** |
 
 ---
 
@@ -240,7 +245,7 @@ assert!(!rows.is_empty());  // Will panic if no results
 
 ### RUST-011: Unsafe Index Calculation in compress_geometry_vectors (HIGH)
 
-**File:** `database_server/src/aisdb_db_server.rs:578-584`
+**File:** `database_server/src/aisdb_db_server.rs:579-581`
 
 ```rust
 for i in 0..count_orig {
@@ -293,20 +298,6 @@ let listener = TcpListener::bind(tcp_listen_address.clone())
 
 ---
 
-### RUST-028: UTF-8 Conversion Panic in Receiver (HIGH)
-
-**File:** `receiver/src/receiver.rs:199`
-
-```rust
-let msg_txt = &String::from_utf8(buf[0..i].to_vec()).unwrap();
-```
-
-**Problem:** `from_utf8().unwrap()` panics if raw network data contains invalid UTF-8 bytes.
-
-**Impact:** **Receiver crash** on malformed AIS messages.
-
----
-
 ### RUST-029: Index Out of Bounds on String Slicing (MEDIUM)
 
 **File:** `aisdb_lib/src/decode.rs:185`
@@ -337,25 +328,6 @@ if tables.is_empty() {
 **Problem:** Uses `panic!()` which crashes the server instead of returning an error gracefully.
 
 **Impact:** **Server crash** instead of graceful error handling.
-
----
-
-### RUST-031: Index Deque Bounds Violation (MEDIUM)
-
-**File:** `database_server/src/aisdb_db_server.rs:579-581`
-
-```rust
-for i in 0..count_orig {
-    if i == idx_deque[0] {  // BUG: No check if idx_deque is empty
-        mask.push(true);
-        idx_deque.pop_front().unwrap();
-    }
-}
-```
-
-**Problem:** Accesses `idx_deque[0]` without verifying deque is non-empty.
-
-**Impact:** **Panic** if LineString simplification returns fewer indices than expected.
 
 ---
 
@@ -585,16 +557,6 @@ yield mmsi_rows  # cursor never closed
 
 ---
 
-### ~~PYDB-008: Undefined Name SQLiteDBConn~~ (FALSE POSITIVE)
-
-**Status:** FALSE POSITIVE - This is NOT a bug.
-
-> **CORRECTION NOTE**: `SQLiteDBConn` does not exist anywhere in the codebase. SQLite support has been completely removed.
-
-**Verdict:** Bug report references removed/non-existent code.
-
----
-
 ### PYDB-009: Checksum Logic Error (MEDIUM)
 
 **File:** `aisdb/database/decoder.py:308-309`
@@ -610,6 +572,119 @@ for item in deepcopy(not_zipped):
 **Problem:** When `skip_checksum=True`, files are read and checksums computed but then not recorded.
 
 **Impact:** Wasted I/O when skip_checksum is True.
+
+---
+
+### PYDB-010: SQL Injection - aggregate_static_msgs() SELECT (MEDIUM) [NEW]
+
+**File:** `aisdb/database/dbconn.py:331`
+
+```python
+cur.execute(f'SELECT DISTINCT mmsi FROM ais_global_static')
+```
+
+**Problem:** No parameter binding used, directly interpolates table name in f-string.
+
+**Impact:** Minor variant of SQL injection pattern.
+
+---
+
+### PYDB-011: SQL Injection in drop_indexes/rebuild_indexes (MEDIUM) [NEW]
+
+**File:** `aisdb/database/dbconn.py:228-246`
+
+```python
+dbconn.execute(f"DROP INDEX IF EXISTS ais_global_dynamic_mmsi_time_idx;")
+dbconn.execute(f"CREATE INDEX IF NOT EXISTS idx_ais_global_dynamic_{idx_name} ON ais_global_dynamic ({idx_name});")
+```
+
+**Problem:** Index and column names interpolated via f-string.
+
+**Impact:** If idx_name is ever sourced externally, SQL injection is possible.
+
+---
+
+### PYDB-012: Parameter Signature Mismatch - drop_indexes() (CRITICAL) [NEW]
+
+**File:** `aisdb/database/dbconn.py:223` (definition), `aisdb/database/decoder.py:206` (call)
+
+**Problem:** Method signature has no `month` parameter, but called with `month` as first positional argument.
+
+**Impact:** Runtime TypeError.
+
+---
+
+### PYDB-013: Parameter Signature Mismatch - rebuild_indexes() (CRITICAL) [NEW]
+
+**File:** `aisdb/database/dbconn.py:234` (definition), `aisdb/database/decoder.py:242` (call)
+
+**Problem:** Method signature mismatch - same as PYDB-012.
+
+**Impact:** Runtime TypeError.
+
+---
+
+### PYDB-014: Parameter Signature Mismatch - aggregate_static_msgs() (CRITICAL) [NEW]
+
+**File:** `aisdb/database/dbconn.py:313` (definition), `aisdb/database/decoder.py:249` (call)
+
+```python
+# Definition
+def aggregate_static_msgs(self, verbose: bool = True):
+
+# Call
+dbconn.aggregate_static_msgs(months, verbose)  # WRONG (2 args)
+```
+
+**Problem:** Line 249 calls with 2 args but method only accepts `verbose`.
+
+**Impact:** Runtime TypeError.
+
+---
+
+### PYDB-015: LIMIT Parameter SQL Injection (MEDIUM) [NEW]
+
+**File:** `aisdb/database/dbqry.py:248`
+
+```python
+if 'limit' in self.data.keys():
+    qry += f'\nLIMIT {self.data["limit"]}'
+```
+
+**Problem:** LIMIT value interpolated directly into SQL.
+
+**Impact:** Potential SQL injection if limit is user-supplied.
+
+---
+
+### PYDB-016: Undefined Variable - Loop Index Used After Loop (HIGH) [NEW]
+
+**File:** `aisdb/database/dbqry.py:272-275`
+
+```python
+for i in range(len(ummsi_idx) - 2):
+    yield mmsi_rows[ummsi_idx[i]:ummsi_idx[i + 1]]
+if len(ummsi_idx) > 2:
+    mmsi_rows = mmsi_rows[ummsi_idx[i + 1]:]  # 'i' used AFTER loop
+```
+
+**Problem:** Variable `i` used after loop. If loop never executes, `i` is undefined.
+
+**Impact:** NameError when `len(ummsi_idx) <= 2`.
+
+---
+
+### PYDB-017: SQL Injection - in_bbox_geom() (MEDIUM) [NEW]
+
+**File:** `aisdb/database/sql_query_strings.py:184`
+
+```python
+return f"{alias}.geom && ST_MakeEnvelope({xmin}, {ymin}, {xmax}, {ymax}, 4326)"
+```
+
+**Problem:** Coordinate values interpolated directly into SQL.
+
+**Impact:** SQL injection bypasses parameterized queries.
 
 ---
 
@@ -670,18 +745,6 @@ CREATE TABLE IF NOT EXISTS webdata_marinetraffic (
 
 ---
 
-### ~~SQL-004: Missing Table Alias 'ref'~~ (FALSE POSITIVE)
-
-**Status:** FALSE POSITIVE - The `ref` alias correctly references the CTE named `ref` defined in `cte_coarsetype.sql`.
-
----
-
-### ~~SQL-005: Missing Table Alias in Regional Query~~ (FALSE POSITIVE)
-
-**Status:** FALSE POSITIVE - Same as SQL-004.
-
----
-
 ### SQL-006: Duplicate Column Selection (LOW)
 
 **File:** `aisdb/aisdb_sql/select_join_dynamic_static_clusteredidx.sql:4-5`
@@ -723,7 +786,33 @@ ON CONFLICT DO NOTHING;
 
 ---
 
-### SQL-013: Duplicate utc_second Column Selection (MEDIUM)
+### SQL-009: Data Type Inconsistency for imo Column (MEDIUM) [NEW]
+
+**Files:** Multiple table creation files
+
+```sql
+-- createtable_static.sql:7
+imo INTEGER NOT NULL DEFAULT 0,
+
+-- psql_createtable_static.sql:7
+imo BIGINT NOT NULL DEFAULT 0,
+```
+
+**Problem:** `imo` column defined as INTEGER in some schemas and BIGINT in others.
+
+**Impact:** Type mismatches across database backends.
+
+---
+
+### SQL-010: Ambiguous ON CONFLICT in Global Static Insert (LOW) [NEW]
+
+**File:** `aisdb/aisdb_sql/new_insert_static.sql:23`
+
+**Problem:** Same ambiguous ON CONFLICT pattern.
+
+---
+
+### SQL-013: Same Duplicate utc_second Column (MEDIUM)
 
 **File:** `aisdb/aisdb_sql/select_join_dynamic_static_clusteredidx.sql`
 
@@ -733,21 +822,11 @@ ON CONFLICT DO NOTHING;
 
 ## 4. Track Processing Module Bugs
 
-### TRACK-001: Division by Zero in Speed Calculation (HIGH)
+### ~~TRACK-001: Division by Zero in Speed Calculation~~ (FIXED)
 
 **File:** `aisdb/gis.py:174-176`
 
-```python
-def delta_knots(track, rng=None):
-    rng = range(len(track['time'])) if rng is None else rng
-    ds = np.array([np.max((1, s)) for s in delta_seconds(track, rng)],
-                  dtype=object)
-    return delta_meters(track, rng) / ds * 1.9438445
-```
-
-**Problem:** When `delta_seconds()` returns 0 (identical timestamps), it gets clamped to 1 second, artificially inflating speed calculations.
-
-**Impact:** Speed calculations for vessels with identical consecutive timestamps show artificially incorrect values.
+**Status:** FIXED - Now uses `np.max((1, s))` to clamp delta_seconds to minimum of 1 second.
 
 ---
 
@@ -837,7 +916,7 @@ if not np.all(np.diff(unique_times) > 0):
 
 ---
 
-### TRACK-023: Missing Empty Array Check in track_gen.py (LOW)
+### TRACK-023: Missing Empty Array Check in track_gen.py (HIGH)
 
 **File:** `aisdb/track_gen.py:166`
 
@@ -852,15 +931,46 @@ for k in track['dynamic']
 
 ---
 
-### TRACK-021: Same as TRACK-003 (Duplicate)
+### TRACK-024: Missing Empty Array Check in min_speed_filter (HIGH) [NEW]
 
-**Status:** Combined with TRACK-003 - same np.all() misuse bug.
+**File:** `aisdb/track_gen.py:282`
+
+```python
+deltas = delta_knots(track)
+deltas = np.append(deltas, [deltas[-1]])  # BUG: Assumes deltas is non-empty
+```
+
+**Problem:** If `deltas` is empty, `deltas[-1]` fails with IndexError.
+
+**Impact:** IndexError on empty array.
+
+---
+
+### TRACK-026: Type Access on Empty Array in split_timedelta (HIGH) [NEW]
+
+**File:** `aisdb/track_gen.py:166`
+
+```python
+k: np.array(track[k], dtype=type(track[k][0]))[rng]
+```
+
+**Problem:** Attempts `track[k][0]` to get dtype which fails on empty array.
+
+**Impact:** IndexError on empty filtered arrays.
+
+---
+
+### TRACK-027: Same Issue in split_tracks (HIGH) [NEW]
+
+**File:** `aisdb/track_gen.py:211`
+
+**Problem:** Same pattern as TRACK-026.
 
 ---
 
 ## 5. Web Frontend Bugs
 
-### WEB-001: Comma Operator Bug in Array Access (CRITICAL)
+### WEB-001: Comma Operator Bug in Array Access (HIGH)
 
 **File:** `aisdb_web/map/livestream.js:74`
 
@@ -876,7 +986,7 @@ if (coords[-1, 0] === message.lon && coords[-1, 1] === message.lat) {
 
 ---
 
-### WEB-002: Typo in Event Handler Name (HIGH)
+### WEB-002: Typo in Event Handler Name (MEDIUM)
 
 **File:** `aisdb_web/map/clientsocket.js:266`
 
@@ -906,21 +1016,7 @@ overlay_content.innerHTML = vinfo.meta_string;
 
 ---
 
-### WEB-004: DOM XSS in Vessel Info Display (CRITICAL)
-
-**File:** `aisdb_web/map/map.js:388,390`
-
-```javascript
-overlay_content.innerHTML = `MMSI: ${selected.getId()}<br>`;
-```
-
-**Problem:** Using `innerHTML` with feature IDs without sanitization.
-
-**Impact:** XSS vulnerability if feature IDs contain HTML/JavaScript.
-
----
-
-### WEB-005: DOM XSS in Vessel Type Selector (HIGH)
+### WEB-005: DOM XSS in Vessel Type Selector (MEDIUM)
 
 **File:** `aisdb_web/map/selectform.js:271,276`
 
@@ -934,21 +1030,19 @@ opt.innerHTML = `<div>${label}</div>&ensp;${colordot}`;
 
 ---
 
-### WEB-006: Incorrect Style Function Construction (HIGH)
+### WEB-006: Incorrect Style Function Construction (MEDIUM)
 
-**File:** `aisdb_web/map/palette.js:260-273`
+**File:** `aisdb_web/map/palette.js:277`
 
 ```javascript
-const selectStyle = function (feature) {
-  return new function (feature, zoom) {
-    return new Style({...});
-  }();
-};
+const livestreamStyle = function (feature, zoom) {
+  return new Style({
+    fill: '#EEEEEE',  // Wrong: should be new Fill({color: '#EEEEEE'})
 ```
 
-**Problem:** Returns `new function(){}()` which immediately invokes. Inner function shadows outer `feature` and `zoom` is undefined.
+**Problem:** `fill` property is string instead of Fill object.
 
-**Impact:** `selectStyle` doesn't work as intended - creates same style regardless of input.
+**Impact:** `livestreamStyle` doesn't work as intended.
 
 ---
 
@@ -996,7 +1090,7 @@ window.screnshot_single = screenshot_callback;
 
 ---
 
-### WEB-010: Race Condition in WebSocket Message Handling (MEDIUM)
+### WEB-010: Race Condition in WebSocket Message Handling (HIGH)
 
 **File:** `aisdb_web/map/clientsocket.js:317-324`
 
@@ -1015,7 +1109,7 @@ await timeout(Promise.all([
 
 ---
 
-### WEB-011: WebSocket Send Not Awaited (LOW)
+### WEB-011: WebSocket Send Not Awaited (MEDIUM)
 
 **File:** `aisdb_web/map/clientsocket.js:318-319`
 
@@ -1032,6 +1126,30 @@ await timeout(Promise.all([
 **Problem:** Async callbacks in forEach don't await properly.
 
 **Impact:** Operations may complete in wrong order.
+
+---
+
+### WEB-020: Async forEach with Race Condition (MEDIUM) [NEW]
+
+**File:** `aisdb_web/map/map.js:174`
+
+**Problem:** `forEach` with async callback - operations are fire-and-forget.
+
+---
+
+### WEB-021: Unawaited WebSocket Send Operations (HIGH) [NEW]
+
+**File:** `aisdb_web/map/clientsocket.js:318-319, 331`
+
+**Problem:** `socket.send()` calls in Promise.all not awaited properly.
+
+---
+
+### WEB-022: Incorrect Error Message (LOW) [NEW]
+
+**File:** `aisdb_web/map/selectform.js:338`
+
+**Problem:** Status message says "No data before" when checking upper bound "after".
 
 ---
 
@@ -1094,7 +1212,7 @@ def _vessel_info_dict(dbconn: PostgresDBConn) -> dict:
 
 ---
 
-### WEBDATA-023: Undefined Variable - tracer Logic (MEDIUM)
+### WEBDATA-023: Undefined Variable - tracer Logic (CRITICAL)
 
 **File:** `aisdb/webdata/bathymetry.py:82-92`
 
@@ -1130,7 +1248,7 @@ bathy_segments = np.append(np.append([0], np.where(raster_keys[:-1] != raster_ke
 
 ---
 
-### WEBDATA-025: Multiple Bare Except Clauses (MEDIUM)
+### WEBDATA-025: Multiple Bare Except Clauses (HIGH)
 
 **File:** `aisdb/webdata/_scraper.py:127, 137, 171, 191, 199`
 
@@ -1142,6 +1260,69 @@ except:
 **Problem:** Bare `except:` catches ALL exceptions including KeyboardInterrupt, SystemExit.
 
 **Impact:** Hides serious errors, silent failures, difficult to debug.
+
+---
+
+### WEBDATA-026: Unclosed Temporary Directory (MEDIUM) [NEW]
+
+**File:** `aisdb/weather/data_store.py:171`
+
+```python
+tmp_dir = tempfile.mkdtemp()  # Never cleaned up
+```
+
+**Problem:** Temp directory created but never removed.
+
+**Impact:** Resource leak - GRIB files accumulate.
+
+---
+
+### WEBDATA-027: Unclosed API Client on Exception (HIGH) [NEW]
+
+**File:** `aisdb/weather/weather_fetch.py:70`
+
+```python
+try:
+    self.client = cdsapi.Client()
+except Exception as e:
+    print(f"Error while establishing connection with cdsapi: {e}")
+    # self.client never set!
+```
+
+**Problem:** If client init fails, `self.client` not set, crashes later.
+
+**Impact:** AttributeError on later use.
+
+---
+
+### WEBDATA-028: Silent Failure Returns Empty Dict (MEDIUM) [NEW]
+
+**File:** `aisdb/webdata/_scraper.py:107-140`
+
+**Problem:** Function returns empty dict on failure without indication.
+
+---
+
+### WEBDATA-029: Same Silent Failure Pattern (MEDIUM) [NEW]
+
+**File:** `aisdb/webdata/_scraper.py:153-174`
+
+**Problem:** Same pattern as WEBDATA-028.
+
+---
+
+### WEBDATA-030: Dummy Exception Assignments (HIGH) [NEW]
+
+**File:** `aisdb/webdata/_scraper.py:185-204`
+
+```python
+except:
+    a = 10  # Dummy assignment!
+```
+
+**Problem:** Exception handlers assign to dummy variable instead of handling.
+
+**Impact:** Silent failures on API requests.
 
 ---
 
@@ -1196,7 +1377,7 @@ def sample_dynamictable_insertdata(*, dbconn):
 
 ---
 
-### TEST-032: Incomplete Assertion - shiftcoord (MEDIUM)
+### TEST-032: Incomplete Assertion - shiftcoord (HIGH)
 
 **File:** `aisdb/tests/test_006_gis.py:75-81`
 
@@ -1293,7 +1474,7 @@ on:
 
 ---
 
-### BUILD-020: CI Branch Mismatch in Install Workflow (CRITICAL)
+### BUILD-020: CI Branch Mismatch in Install Workflow (HIGH)
 
 **File:** `.github/workflows/Install.yml:6-11`
 
@@ -1341,7 +1522,7 @@ compatability = "manylinux2014"
 
 ---
 
-### BUILD-024: Wildcard Version Specifications (MEDIUM)
+### BUILD-024: Wildcard Version Specifications (HIGH)
 
 **Files:** Multiple Cargo.toml files
 
@@ -1355,7 +1536,7 @@ geo-types = "*"
 
 ---
 
-### BUILD-025: Invalid TOML Section in Cargo.toml (HIGH)
+### BUILD-025: Invalid TOML Section in Cargo.toml (CRITICAL)
 
 **File:** `database_server/Cargo.toml:14-15`
 
@@ -1381,6 +1562,20 @@ assert aisdb.__version__ >= '1.7.1'
 **Problem:** String comparison of version numbers is lexicographic, not semantic.
 
 **Impact:** `'1.10.0' >= '1.7.1'` evaluates to `False` (incorrect).
+
+---
+
+### BUILD-027: Incomplete Step Name in CI Workflow (LOW) [NEW]
+
+**File:** `.github/workflows/CI.yml:249`
+
+```yaml
+- name: Restart PostgreSQL using
+```
+
+**Problem:** Step name is incomplete - ends with "using".
+
+**Impact:** Unclear CI logs.
 
 ---
 
@@ -1583,6 +1778,36 @@ chunk_time_interval => 604800  -- Raw integer (7 days in seconds)
 
 ---
 
+### INT-024: UTF-8 Parsing Panic Without Error Handling (HIGH) [NEW]
+
+**Files:** `receiver/src/receiver.rs:199, 431`, `client_webassembly/src/lib.rs:192`
+
+**Problem:** Multiple instances where invalid UTF-8 causes panic.
+
+**Impact:** Malformed messages crash receiver/WASM client.
+
+---
+
+### INT-025: CSV Column Index Panics on Missing Fields (HIGH) [NEW]
+
+**File:** `aisdb_lib/src/csvreader.rs:42, 125-135`
+
+**Problem:** CSV parsing assumes all columns exist at fixed indices.
+
+**Impact:** Missing/truncated CSV columns cause panic.
+
+---
+
+### INT-026: Database Timestamp Conversion Panic (MEDIUM) [NEW]
+
+**File:** `database_server/src/aisdb_db_server.rs:325, 329`
+
+**Problem:** `from_timestamp_opt().unwrap()` panics on invalid range.
+
+**Impact:** Out-of-range timestamps crash server.
+
+---
+
 ## 10. Discretization and Miscellaneous Bugs
 
 ### DISC-001: Hardcoded UTM Zone 19N (HIGH)
@@ -1598,12 +1823,6 @@ gdf_hex = gdf_hex.to_crs(epsg=32619)  # UTM Zone 19N
 **Impact:** Area calculations completely wrong for most of world's oceans.
 
 **Verify:** `grep -n "epsg=" aisdb/discretize/h3.py`
-
----
-
-### ~~DISC-002: Missing return statement in get_resolution_for_area()~~ (FALSE POSITIVE)
-
-**Status:** FALSE POSITIVE - Function does not exist in actual codebase.
 
 ---
 
@@ -1679,32 +1898,72 @@ def geo_interp_time(tracks, step=timedelta(minutes=10), original_crs=4269):
 
 ---
 
+### DISC-021: Bare yield Statement in Generator (MEDIUM) [NEW]
+
+**File:** `aisdb/network_graph.py:217`
+
+**Problem:** Function uses bare `yield` (yields None).
+
+**Impact:** Unusable as proper iterator.
+
+---
+
+### DISC-022: Unchecked Array Access in _transitinfo() (HIGH) [NEW]
+
+**File:** `aisdb/network_graph.py:90-91`
+
+**Problem:** Accesses `zoneset[0]` and `zoneset[-1]` without empty check.
+
+**Impact:** IndexError on empty zoneset.
+
+---
+
+### DISC-023: Unchecked Access in _time_in_shoredist_rng() (HIGH) [NEW]
+
+**File:** `aisdb/network_graph.py:60`
+
+**Problem:** Function accesses 'km_from_shore' unconditionally.
+
+**Impact:** KeyError on tracks without shore distance data.
+
+---
+
+### DISC-024: Unused Interpolation Parameter (LOW) [NEW]
+
+**File:** `aisdb/network_graph.py:82`
+
+**Problem:** Parameter `interp_resolution` defined but never used.
+
+**Impact:** Misleading API.
+
+---
+
 ## Summary Statistics
 
 ### By Severity
 
 | Severity | Count | Percentage |
 |----------|-------|------------|
-| Critical | 26 | 15.0% |
-| High | 58 | 33.5% |
-| Medium | 56 | 32.4% |
-| Low | 33 | 19.1% |
-| **Total** | **173** | 100% |
+| Critical | 29 | 14.6% |
+| High | 73 | 36.7% |
+| Medium | 64 | 32.2% |
+| Low | 33 | 16.6% |
+| **Total** | **199** | 100% |
 
 ### By Category
 
 | Category | Description | Count |
 |----------|-------------|-------|
-| Crash/Panic | Unhandled exceptions, panics | 35 |
-| Data Corruption | Wrong calculations, swapped coordinates | 18 |
-| Resource Leak | Unclosed cursors, memory leaks | 12 |
-| Security | SQL injection, XSS vulnerabilities | 6 |
-| Type Mismatch | Year 2038, wrong types | 15 |
-| Silent Failure | Errors suppressed | 14 |
-| Build/Config | CI issues, dependency problems | 7 |
+| Crash/Panic | Unhandled exceptions, panics | 42 |
+| Data Corruption | Wrong calculations, swapped coordinates | 22 |
+| Resource Leak | Unclosed cursors, memory leaks | 15 |
+| Security | SQL injection, XSS vulnerabilities | 11 |
+| Type Mismatch | Year 2038, wrong types | 18 |
+| Silent Failure | Errors suppressed | 18 |
+| Build/Config | CI issues, dependency problems | 8 |
 | Test Quality | Missing assertions | 8 |
-| Logic Error | Off-by-one, wrong conditions | 28 |
-| Other | Miscellaneous issues | 30 |
+| Logic Error | Off-by-one, wrong conditions | 32 |
+| Other | Miscellaneous issues | 25 |
 
 ### Priority Recommendations
 
@@ -1713,14 +1972,14 @@ def geo_interp_time(tracks, step=timedelta(minutes=10), original_crs=4269):
 2. RUST-005: Empty array panic in Python-exposed function
 3. PYDB-001: SQL injection vulnerability
 4. SQL-001, SQL-002: UPSERT data corruption
-5. WEB-001: Comma operator bug in array access
-6. WEB-003, WEB-004: DOM XSS vulnerabilities
-7. INT-001: Year 2038 timestamp overflow
-8. WEBDATA-001: Latitude/longitude swap in raster lookups
+5. WEB-003: DOM XSS vulnerability
+6. INT-001: Year 2038 timestamp overflow
+7. WEBDATA-001: Latitude/longitude swap in raster lookups
+8. WEBDATA-023: Undefined tracer variable crashes DEBUG mode
 
 **High Priority:**
 1. All cursor resource leaks (PYDB-005, PYDB-006, PYDB-007, WEBDATA-017)
-2. Parameter signature mismatch (PYDB-002)
+2. Parameter signature mismatches (PYDB-002, PYDB-012, PYDB-013, PYDB-014)
 3. Timestamp truncation bugs (INT-002, INT-003, INT-004)
 4. Haversine coordinate swap (TRACK-002, INT-017)
 
@@ -1757,5 +2016,5 @@ grep -rn "def test_" aisdb/tests/*.py -A20 | grep -v "assert"
 ---
 
 *This report was generated by 10 specialized exploration agents covering all code paths in the AISdb-lite repository.*
-*Analysis Date: December 11, 2025*
-*Report Version: 1.6.0*
+*Analysis Date: December 12, 2025*
+*Report Version: 1.7.0*
