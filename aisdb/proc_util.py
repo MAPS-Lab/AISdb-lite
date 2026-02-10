@@ -352,9 +352,6 @@ def getfiledate(filename, source=None):
                 n += 1
                 line = f.readline()
                 head = line.rsplit('\\', 1)[0]
-                # if n > 10000:
-                #    print(f'bad! {filename}')
-                #    return False
                 assert n <= 10000
             split0 = re.split('c:', head)[1]
             try:

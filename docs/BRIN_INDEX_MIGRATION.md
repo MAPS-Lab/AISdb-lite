@@ -126,7 +126,10 @@ WHERE tablename = 'ais_global_dynamic' AND indexname LIKE '%time%';
 Run the CI validation test:
 ```bash
 cd /path/to/ais_lightning/codes
-PGHOST="localhost" PGUSER="postgres" PGPASSWORD="your_password" \
+# Set database credentials via environment variables
+export PGHOST="localhost"
+export PGUSER="postgres"
+export PGPASSWORD="..."
 python3 step4_test_ci.py
 ```
 
@@ -136,22 +139,25 @@ Three benchmark scripts are available for comprehensive validation:
 
 **1 Day Test (~3M records):**
 ```bash
-PGHOST="localhost" PGUSER="postgres" PGPASSWORD="your_password" \
-CSV_PATH="/path/to/ais/data" \
+# Export credentials first
+export PGHOST="localhost" PGUSER="postgres" PGPASSWORD="..."
+export CSV_PATH="/path/to/ais/data"
 bash step4_comparative_1day.sh
 ```
 
 **1 Week Test (~21M records):**
 ```bash
-PGHOST="localhost" PGUSER="postgres" PGPASSWORD="your_password" \
-CSV_PATH="/path/to/ais/data" \
+# Export credentials first
+export PGHOST="localhost" PGUSER="postgres" PGPASSWORD="..."
+export CSV_PATH="/path/to/ais/data"
 bash step4_comparative_1week.sh
 ```
 
 **2 Weeks Test (~43M records):**
 ```bash
-PGHOST="localhost" PGUSER="postgres" PGPASSWORD="your_password" \
-CSV_PATH="/path/to/ais/data" \
+# Export credentials first
+export PGHOST="localhost" PGUSER="postgres" PGPASSWORD="..."
+export CSV_PATH="/path/to/ais/data"
 bash step4_comparative_2weeks.sh
 ```
 

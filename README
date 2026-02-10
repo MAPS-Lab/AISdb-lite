@@ -5,10 +5,10 @@ Welcome to AISdb, the premier open-source database management system for storing
 
 **Key Features:**
 
-- **Efficient Data Management:** AISdb leverages SQLite and PostgreSQL to provide scalable solutions for local and server-based data handling needs.
+- **Efficient Data Management:** AISdb leverages PostgreSQL to provide scalable solutions for server-based data handling and advanced analytics.
 - **Python Interface:** Offering a Python-based API for ease of use across different programming skill levels, ensuring broad accessibility and efficiency.
 - **Advanced Analytical Tools:** Features a comprehensive suite of analytical tools for conducting complex queries, processing data, and performing statistical analyses directly within the database.
-- **Data Visualization and Export:** Supports dynamic data visualization and provides options for data export in various formats for further analysis or reporting.
+- **Data Export:** Provides options for data export in various formats for further analysis or reporting.
 - **Modular and Scalable:** AISdb is designed with performance, scalability, and ease of use, featuring optimized database schemas and employing Rust for critical data processing tasks.
 
 **Documentation and Resources:**

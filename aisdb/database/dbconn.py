@@ -245,55 +245,7 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
                 dbconn.execute(
                     f"CREATE INDEX IF NOT EXISTS idx_ais_global_dynamic_{idx_name} ON ais_global_dynamic ({idx_name});")
 
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_mmsi '
-        #     f'ON ais_{month}_dynamic (mmsi)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing mmsi: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_time '
-        #     f'ON ais_{month}_dynamic (time)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing time: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_lon '
-        #     f'ON ais_{month}_dynamic (longitude)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing longitude: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_lat '
-        #     f'ON ais_{month}_dynamic (latitude)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing latitude: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_cluster '
-        #     f'ON ais_{month}_dynamic (mmsi, time, longitude, latitude, source)'
-        # )
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing combined index: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_static_mmsi '
-        #     f'ON ais_{month}_static (mmsi)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing static mmsi: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_static_time '
-        #     f'ON ais_{month}_static (time)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing static time: {month}')
-        # dbconn.execute(
-        #     f'CLUSTER {"VERBOSE" if verbose else ""} ais_{month}_dynamic\n'
-        #     f'USING idx_ais_{month}_dynamic_cluster')
         dbconn.commit()
-        # if verbose:
-        #     print(f'done clustering: {month}')
 
     def deduplicate_dynamic_msgs(self, verbose=True):
         dbconn = self.conn

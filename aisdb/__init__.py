@@ -11,8 +11,6 @@ with open(
 
 sqlpath = os.path.abspath(os.path.join(os.path.dirname(__file__), 'aisdb_sql'))
 
-import aisdb.web_interface
-
 from .database.decoder import decode_msgs
 
 from .database.dbconn import DBConn, PostgresDBConn

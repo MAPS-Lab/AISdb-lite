@@ -250,15 +250,14 @@ def process_raw_files(dbconn, dbindex, raw_files, source, timescaledb, raw_inser
 
     if not raw_insertion and vacuum:
         print("finished parsing data\nvacuuming...")
-        if isinstance(dbconn, SQLiteDBConn):
-            if vacuum is True:
-                dbconn.execute("VACUUM")
-            elif isinstance(vacuum, str):
-                assert not os.path.isfile(vacuum)
-                dbconn.execute("VACUUM INTO ?", (vacuum,))
-            else:
-                raise ValueError("vacuum arg must be boolean or filepath string")
-            dbconn.commit()
+        if vacuum is True:
+            dbconn.execute("VACUUM")
+        elif isinstance(vacuum, str):
+            assert not os.path.isfile(vacuum)
+            dbconn.execute("VACUUM INTO ?", (vacuum,))
+        else:
+            raise ValueError("vacuum arg must be boolean or filepath string")
+        dbconn.commit()
 
     return completed_files
 

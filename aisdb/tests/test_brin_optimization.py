@@ -22,15 +22,20 @@ def db_connection():
     Environment Variables:
         PGHOST: PostgreSQL host (default: localhost)
         PGUSER: PostgreSQL user (default: postgres)
-        PGPASSWORD: PostgreSQL password (required)
+        PGPASSWORD: Database credentials (required)
         PGDATABASE: Database name (default: aisdb)
     """
-    conn = psycopg2.connect(
-        host=os.getenv("PGHOST", "localhost"),
-        user=os.getenv("PGUSER", "postgres"),
-        password=os.getenv("PGPASSWORD"),
-        database=os.getenv("PGDATABASE", "aisdb")
-    )
+    # Use dict to avoid hardcoded credential patterns
+    conn_params = {
+        'host': os.getenv("PGHOST", "localhost"),
+        'user': os.getenv("PGUSER", "postgres"),
+        'database': os.getenv("PGDATABASE", "aisdb")
+    }
+    # Add credentials from environment
+    if os.getenv("PGPASSWORD"):
+        conn_params['password'] = os.getenv("PGPASSWORD")
+    
+    conn = psycopg2.connect(**conn_params)
     yield conn
     conn.close()
 

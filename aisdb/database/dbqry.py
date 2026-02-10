@@ -48,13 +48,13 @@ class DBQuery(UserDict):
 
         >>> import os
         >>> from datetime import datetime
-        >>> from aisdb import SQLiteDBConn, DBQuery, decode_msgs
+        >>> from aisdb import PostgresDBConn, DBQuery, decode_msgs
         >>> from aisdb.database.sqlfcn_callbacks import in_timerange_validmmsi
 
-        >>> dbpath = './testdata/test.db'
+        >>> conn_info = f'postgresql://user:pass@host:5432/aisdb'
         >>> start, end = datetime(2021, 7, 1), datetime(2021, 7, 7)
         >>> filepaths = ['aisdb/tests/testdata/test_data_20210701.csv', 'aisdb/tests/testdata/test_data_20211101.nm4']
-        >>> with SQLiteDBConn(dbpath) as dbconn:
+        >>> with PostgresDBConn(conn_info) as dbconn:
         ...     decode_msgs(filepaths=filepaths, dbconn=dbconn, source='TESTING', verbose=False)
         ...     q = DBQuery(dbconn=dbconn, callback=in_timerange_validmmsi, start=start, end=end)
         ...     for rows in q.gen_qry():
@@ -64,34 +64,10 @@ class DBQuery(UserDict):
         ...         break
             '''
 
-    #        dbpath (string)
-    #            database filepath to connect to
-    #        dbpaths (list)
-    #            optionally pass a list of filepaths instead of a single dbpath
-
-    def __init__(self, *, dbconn, dbpath=None, dbpaths=[], **kwargs):
+    def __init__(self, *, dbconn, **kwargs):
         assert isinstance(
             dbconn,
             (PostgresDBConn)), 'Invalid database connection'
-        '''
-        if isinstance(dbconn, SQLiteDBConn):
-            if dbpaths == [] and dbpath is None:
-                raise ValueError(
-                    'must supply either dbpaths list or dbpath string value')
-            elif dbpaths == []:  # pragma: no cover
-                dbpaths = [dbpath]
-
-        elif isinstance(dbconn, PostgresDBConn):
-            if dbpath is not None:
-                raise ValueError(
-                    "the dbpath argument may not be used with a Postgres connection"
-                )
-        else:
-            raise ValueError("Invalid database connection")
-        '''
-
-        # for dbpath in dbpaths:
-        #    dbconn._attach(dbpath)
         '''
         if isinstance(dbconn, ConnectionType):
             raise ValueError('Invalid database connection.'
@@ -153,8 +129,6 @@ class DBQuery(UserDict):
         ''').format(TABLE=psycopg.sql.Literal(f'ais_global_dynamic')))
 
         if len(cur.fetchall()) == 0:  # pragma: no cover
-            # if isinstance(self.dbconn, ConnectionType.SQLITE.value):
-            #    sqlite_createtable_dynamicreport(self.dbconn, month)
             warnings.warn('No data for selected time range! '
                           f'{rng_string}')
 
@@ -212,7 +186,6 @@ class DBQuery(UserDict):
         '''
 
         # initialize dbconn, run query
-        assert 'dbpath' not in self.data.keys()
         db_rng = self.dbconn.db_daterange
 
         if not self.dbconn.db_daterange:

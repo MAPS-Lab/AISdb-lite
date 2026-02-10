@@ -304,9 +304,8 @@ def graph(
                 collection of zones defined as polygons, these will
                 be used as nodes in the network graph
             dbconn (ConnectionType)
-                Either a :class:`aisdb.database.dbconn.SQLiteDBConn` or
                 :class:`aisdb.database.dbconn.PostgresDBConn` database
-                connection objects
+                connection object
             data_dir (string)
                 location of raster data
             trafficDBpath (string)
@@ -357,14 +356,14 @@ def graph(
         >>> import os
         >>> import shapely
         >>> from datetime import datetime
-        >>> from aisdb import DBQuery, Domain, graph, decode_msgs
+        >>> from aisdb import DBQuery, Domain, PostgresDBConn, graph, decode_msgs
         >>> from aisdb.database.sqlfcn_callbacks import in_bbox_time
 
-        >>> # create example database file
-        >>> dbpath = './example.sqlitedb'
+        >>> # create PostgreSQL connection
+        >>> conn_str = 'postgresql://user:pass@localhost:5432/aisdb'
         >>> filepaths = ['./aisdb/tests/testdata/test_data_20210701.csv',
         ...              './aisdb/tests/testdata/test_data_20211101.nm4']
-        >>> with SQLiteDBConn(dbpath) as dbconn:
+        >>> with PostgresDBConn(conn_str) as dbconn:
         ...     decode_msgs(filepaths=filepaths, dbconn=dbconn,
         ...     source='TESTING', verbose=False)
 
@@ -383,7 +382,7 @@ def graph(
 
         Then, query db for points in domain
 
-        >>> with SQLiteDBConn(dbpath) as dbconn:
+        >>> with PostgresDBConn(conn_str) as dbconn:
         ...     qry = DBQuery(
         ...             dbconn=dbconn,
         ...             callback=in_bbox_time,

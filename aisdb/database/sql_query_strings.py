@@ -39,11 +39,7 @@ def in_bbox(*, alias, xmin, xmax, ymin, ymax, **_):
     {alias}.latitude >= {ymin} AND
     {alias}.latitude <= {ymax}'''
 
-    # if xmin < xmax:
     assert xmin < xmax
-    # if xmin < -180 and xmax > 180:
-    #    raise ValueError(f'xmin, xmax are out of bounds! {xmin=} < -180,{xmax=} > 180')
-    # elif -180 <= xmin <= 180 and -180 <= xmax <= 180:
     s = f'''{alias}.longitude >= {xmin} AND
             {alias}.longitude <= {xmax} AND '''
     """

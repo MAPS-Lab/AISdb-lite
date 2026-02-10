@@ -90,9 +90,6 @@ def test_sql_query_strings_postgres_global(tmpdir):
                 callback=callback, mmsi=316000000, mmsis=[316000000, 316000001]
             ).gen_qry(fcn=sqlfcn.crawl_dynamic_static)
             next(rowgen)
-
-# def test_noaa_data_ingest_postgres_only(tmpdir):
-#     testdatacsv = os.path.join(os.path.dirname(__file__), "testdata", "test_data_noaa_20230101.csv")
 #     filepaths = [testdatacsv]
 
 #     start_time = datetime(2023, 1, 1)
