@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS ais_global_dynamic
 (
-    mmsi          INTEGER NOT NULL,
-    time          INTEGER NOT NULL,
+    mmsi          BIGINT NOT NULL,
+    time          BIGINT NOT NULL,
     longitude     REAL NOT NULL,
     latitude      REAL NOT NULL,
     rot           REAL,
@@ -21,8 +21,16 @@ SELECT create_hypertable(
     'time',
     partitioning_column => 'mmsi',
     number_partitions => 4,
-    chunk_time_interval => 604800
+    chunk_time_interval => 604800,
+    if_not_exists => TRUE,
+    migrate_data => TRUE
 );
+
+-- When a plain (non-timescale) table was migrated into a hypertable above,
+-- it lacks the generated geom column; add it before building the GiST index.
+ALTER TABLE ais_global_dynamic
+    ADD COLUMN IF NOT EXISTS geom GEOMETRY(POINT, 4326)
+    GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)) STORED;
 
 ALTER TABLE ais_global_dynamic SET (
     timescaledb.compress = false,
@@ -30,5 +38,5 @@ ALTER TABLE ais_global_dynamic SET (
     timescaledb.compress_segmentby = 'mmsi'
 );
 
-CREATE INDEX idx_ais_global_dynamic_geom ON ais_global_dynamic USING GIST (geom);
-CREATE INDEX idx_ais_global_dynamic_time ON ais_global_dynamic (time);
+CREATE INDEX IF NOT EXISTS idx_ais_global_dynamic_geom ON ais_global_dynamic USING GIST (geom);
+CREATE INDEX IF NOT EXISTS idx_ais_global_dynamic_time ON ais_global_dynamic USING BRIN (time);

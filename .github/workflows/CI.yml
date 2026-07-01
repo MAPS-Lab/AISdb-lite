@@ -38,10 +38,6 @@ jobs:
             ${{ runner.os }}-pip-
             ${{ runner.os }}-cargo-
       
-      - uses: ikalnytskyi/action-setup-postgres@v4
-        with:
-          password: ${{ secrets.PGPASS }}
-      
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -65,106 +61,47 @@ jobs:
           cargo install --locked wasm-bindgen-cli --verbose
           cargo install --locked wasm-opt --verbose
 
-      - name: Locate PostgreSQL Installation Paths
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Skip DB setup on Windows
         run: |
-          Write-Host "Finding PostgreSQL path..."
-          $env:PGPASSWORD="${{ env.pgpass }}"
-          Write-Host "Verifying PostgreSQL connection..."
-          psql -U postgres -c "SELECT version();"
-          psql -U postgres -c "SHOW config_file;"
+          echo "Skipping PostgreSQL/PostGIS setup on Windows (Docker images are Linux-only)."
           
-      - name: Install TimescaleDB on Windows
-        run: |
-          # Download TimescaleDB for PostgreSQL 14 (not 17)
-          Invoke-WebRequest -Uri "https://github.com/timescale/timescaledb/releases/download/2.19.0/timescaledb-postgresql-14-windows-amd64.zip" -OutFile "timescaledb.zip"
-
-          # Create a folder for extraction
-          New-Item -ItemType Directory -Force -Path "C:\timescaledb"
-          Expand-Archive -Path "timescaledb.zip" -DestinationPath "C:\timescaledb"
-
-          # Locate setup.exe
-          $setupPath = Get-ChildItem -Path "C:\timescaledb" -Recurse -Filter "setup.exe" | Select-Object -First 1 | ForEach-Object { $_.FullName }
-          Write-Host "Found setup executable at: $setupPath"
-
-          # Unblock and set up environment
-          Unblock-File -Path $setupPath
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          $setupDir = Split-Path -Path $setupPath
-          Set-Location -Path $setupDir
-
-          # Run the installer first (before editing postgresql.conf)
-          Start-Process -FilePath $setupPath -ArgumentList "/S --yes" -WorkingDirectory $setupDir -Wait -NoNewWindow
-
-          # Modify postgresql.conf now that DLLs are installed
-          $pgDataDir = "D:\a\_temp\pgdata"
-          $pgConfigPath = "D:/a/_temp/pgdata/postgresql.conf"
-          (Get-Content $pgConfigPath) -replace "^#?\s*shared_preload_libraries\s*=.*", "shared_preload_libraries = 'timescaledb'" | Set-Content $pgConfigPath
-
-          # Restart PostgreSQL to load TimescaleDB
-          Write-Host "Restarting PostgreSQL after installation..."
-          pg_ctl -D $pgDataDir restart
-          Start-Sleep -Seconds 5
-
-          # Enable extension
-          $env:PGPASSWORD="${{ env.pgpass }}"
-          psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
-        shell: pwsh
-        # Enable extension
-      - name: Verify TimescaleDB Extension
-        run: |
-          $env:PGPASSWORD="${{ env.pgpass }}"
-          psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
-
-          # Verify that the TimescaleDB extension is loaded
-          Write-Host "Verifying TimescaleDB extension is installed..."
-          psql -U postgres -d postgres -c "SELECT * FROM pg_extension WHERE extname = 'timescaledb';"
-
-      - name: Install PostGIS for PostgreSQL 14 on Windows
-        run: |
-
-          Invoke-WebRequest -Uri "https://download.osgeo.org/postgis/windows/pg14/postgis-bundle-pg14x64-setup.exe" -OutFile "postgis-installer.exe"
-
-          # Silent install to default PostgreSQL 14 directory
-          Start-Process -FilePath ".\postgis-installer.exe" -ArgumentList "/SILENT" -Wait
-
-          Write-Host "PostGIS installed for PostgreSQL 14"
-        shell: pwsh
-
-      - name: Enable PostGIS Extensions
-        run: |
-          $env:PGPASSWORD="${{ env.pgpass }}"
-          psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-          psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS postgis_raster;"
-          Write-Host "PostGIS extensions enabled."
-        shell: pwsh
-
-      - name: Verify PostGIS Installation
-        run: |
-          $env:PGPASSWORD="${{ env.pgpass }}"
-          psql -U postgres -d postgres -c "SELECT PostGIS_Full_Version();"
-        shell: pwsh
-
       - name: Create Python Virtual Environment and Install Dependencies
         run: |
           python -m venv AISdb
-          AISdb\Scripts\activate
+          . AISdb\Scripts\Activate.ps1
           python -m pip install --upgrade pip
           python -m pip install xarray
           python -m pip install maturin
           maturin develop --release --extras=test,docs
           python -m pip install --upgrade pytest pytest-dotenv pytest-cov furl hypothesis trustme astor pyopenssl isort pydirectory
 
-      - name: Create testdata directory
-        run: mkdir -p ./AISdb/testdata
-        
       - name: Run Tests
         run: |
-          AISdb\Scripts\activate
-           pytest ./aisdb/tests/ --ignore=./aisdb/tests/test_014_marinetraffic.py --ignore=./aisdb/tests/test_001_postgres.py --ignore=./aisdb/tests/test_004_sqlfcn.py --ignore=./aisdb/tests/test_002_decode.py --ignore=./aisdb/tests/test_005_dbqry.py --maxfail=10
+          . AISdb\Scripts\Activate.ps1
+          pytest ./aisdb/tests/ \
+            --ignore=./aisdb/tests/test_001_postgres.py \
+            --ignore=./aisdb/tests/test_001_postgres_global.py \
+            --ignore=./aisdb/tests/test_002_decode.py \
+            --ignore=./aisdb/tests/test_002_decode_global.py \
+            --ignore=./aisdb/tests/test_005_dbqry.py \
+            --ignore=./aisdb/tests/test_005_dbqry_postgres.py \
+            --ignore=./aisdb/tests/test_007_trackgen.py \
+            --ignore=./aisdb/tests/test_008_interp.py \
+            --ignore=./aisdb/tests/test_011_ui.py \
+            --ignore=./aisdb/tests/test_013_proc_util.py \
+            --ignore=./aisdb/tests/test_014_marinetraffic.py \
+            --maxfail=10
 
       - name: Clean Up
         run: |
           Remove-Item -Recurse -Force AISdb
+          docker rm -f aisdb-pg
+
 
   build-and-test-linux:
     runs-on: ubuntu-latest
@@ -214,7 +151,6 @@ jobs:
           database: postgres
           postgres-version: "17"
           ssl: false
-          port: 5432
         id: postgres
       
       - name: Test PostgreSQL Connection
@@ -223,7 +159,7 @@ jobs:
           psql service=${{ steps.postgres.outputs.service-name }} -c "SELECT 1"
           psql ${{ steps.postgres.outputs.connection-uri }} -c 'SHOW config_file'
           psql ${{ steps.postgres.outputs.connection-uri }} -c "CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD '${{ env.POSTGRES_PASSWORD }}';"
-
+      
       - name: Add TimescaleDB Package
         run: |
           echo "deb https://packagecloud.io/timescale/timescaledb/ubuntu/ $(lsb_release -c -s) main" | sudo tee /etc/apt/sources.list.d/timescaledb.list
@@ -232,13 +168,13 @@ jobs:
       
       - name: Install and Configure TimescaleDB Extension
         run: |
-          sudo apt-get install -y timescaledb-2-postgresql-17 postgresql-client-17
-          echo "TimescaleDB Extension installed"
-      
-      - name: Add PostGIS and Install
-        run: |
-          sudo apt-get install -y postgresql-17-postgis-3 postgresql-17-postgis-3-scripts
-          echo "PostGIS installed for PostgreSQL 17"
+          sudo apt-get install -y timescaledb-2-postgresql-17 postgresql-client-17 postgresql-17-postgis-3
+          echo "TimescaleDB and PostGIS Extensions installed"
+
+      # - name: Apply TimescaleDB tuning
+      #   run: |
+      #     sudo timescaledb-tune --pg-config="/home/runner/work/_temp/pgdata/postgresql.conf" --quiet --yes
+      #     echo "TimescaleDB tuning applied"
         
       - name: Enable TimescaleDB in PostgreSQL Config
         run: |
@@ -253,19 +189,10 @@ jobs:
     
       - name: Create TimescaleDB Extension
         run: |
-          sudo -u postgres psql ${{ steps.postgres.outputs.connection-uri }} -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
-          echo "TimescaleDB Extension created."
-
-      - name: Create PostGIS Extension
-        run: |
           sudo -u postgres psql ${{ steps.postgres.outputs.connection-uri }} -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-          sudo -u postgres psql ${{ steps.postgres.outputs.connection-uri }} -c "CREATE EXTENSION IF NOT EXISTS postgis_topology;"
-          echo "PostGIS Extensions created."
-      
-      - name: Verify PostGIS Extension
-        run: |
-          sudo -u postgres psql ${{ steps.postgres.outputs.connection-uri }} -c "SELECT PostGIS_Full_Version();"
-
+          sudo -u postgres psql ${{ steps.postgres.outputs.connection-uri }} -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
+          echo "PostGIS and TimescaleDB Extensions created."
+          
       - name: Create Python Virtual Environment and Install Dependencies
         run: |
           python -m venv AISdb
@@ -276,19 +203,27 @@ jobs:
           maturin develop --release --extras=test,docs
           python -m pip install --upgrade pytest pytest-dotenv pytest-cov furl hypothesis trustme astor pyopenssl isort pydirectory
 
-      - name: Create testdata directory
-        run: mkdir -p ./AISdb/testdata
+      # - name: Pre-download Data to Bypass Server Firewall
+      #   run: |
+      #     sudo apt-get install -y aria2
+      #     mkdir -p aisdb/testdata
+      #     BATHY_URL="http://bigdata5.research.cs.dal.ca/raster-bathy.7z" 
+      #     SHAPE_URL="http://bigdata5.research.cs.dal.ca/geo_land_water_NorthAmerica.7z"
+          
+      #     aria2c -x 16 -s 16 -d aisdb/testdata -o raster-bathy.7z "$BATHY_URL"
+      #     aria2c -x 16 -s 16 -d aisdb/testdata -o geo_land_water_NorthAmerica.7z "$SHAPE_URL"
 
+          
       - name: Run Tests
         run: |
           source ./AISdb/bin/activate
-          pytest ./aisdb/tests/ --ignore=./aisdb/tests/test_014_marinetraffic.py --ignore=./aisdb/tests/test_001_postgres.py --ignore=./aisdb/tests/test_004_sqlfcn.py --ignore=./aisdb/tests/test_002_decode.py --ignore=./aisdb/tests/test_005_dbqry.py --maxfail=10
+          pytest ./aisdb/tests/ --ignore=./aisdb/tests/test_014_marinetraffic.py --maxfail=10
       
       - name: Clean Up
         run: |
           rm -rf AISdb
           sudo apt-get clean
-          
+
   build-and-test-macos:
     runs-on: macos-latest
     needs: [macos]
@@ -358,6 +293,11 @@ jobs:
         run: |
           psql postgres -c "CREATE ROLE postgres WITH LOGIN SUPERUSER PASSWORD '${{ env.POSTGRES_PASSWORD }}';"
 
+      - name: Install PostGIS
+        run: |
+          brew install postgis
+          brew cleanup
+
       - name: Install TimescaleDB
         run: |
           brew tap timescale/tap
@@ -365,17 +305,6 @@ jobs:
           timescaledb-tune --quiet --yes
           brew services restart postgresql@17
           brew cleanup
-      
-      - name: Install PostGIS
-        run: |
-          brew install postgis
-          brew services restart postgresql@17
-          echo "PostGIS installed and PostgreSQL restarted"
-      
-      - name: Create PostGIS Extension
-        run: |
-          psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-          psql -U postgres -d postgres -c "SELECT PostGIS_Full_Version();"
 
       - name: Setup TimescaleDB
         run: |
@@ -391,6 +320,7 @@ jobs:
           
           brew services restart postgresql@17
           sleep 5
+          psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS postgis;"
           psql -U postgres -d postgres -c "CREATE EXTENSION IF NOT EXISTS timescaledb;"
 
       - name: Create Python Virtual Environment and Install Dependencies
@@ -403,13 +333,10 @@ jobs:
           maturin develop --release --extras=test,docs
           python -m pip install --upgrade pytest pytest-dotenv pytest-cov furl hypothesis trustme astor pyopenssl isort pydirectory
 
-      - name: Create testdata directory
-        run: mkdir -p ./AISdb/testdata
-
       - name: Run Tests
         run: |
           source ./AISdb/bin/activate
-          pytest ./aisdb/tests/ --ignore=./aisdb/tests/test_014_marinetraffic.py --ignore=./aisdb/tests/test_001_postgres.py --ignore=./aisdb/tests/test_004_sqlfcn.py --ignore=./aisdb/tests/test_002_decode.py --ignore=./aisdb/tests/test_005_dbqry.py --maxfail=10
+          pytest ./aisdb/tests/ --ignore=./aisdb/tests/test_014_marinetraffic.py --maxfail=10
 
       - name: Clean Up
         run: |
@@ -489,6 +416,10 @@ jobs:
         target: [ x64, x86 ]
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'

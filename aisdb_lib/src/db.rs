@@ -163,7 +163,7 @@ pub fn sqlite_insert_static(
 pub fn postgres_insert_static(
     tx: &mut PGTransaction,
     msgs: Vec<VesselData>,
-    mstr: &str,
+    _mstr: &str,
     source: &str,
 ) -> Result<(), postgres::Error> {
     // let sql = sql_from_file("new_insert_static.sql").replace("{}", mstr);
@@ -177,8 +177,8 @@ pub fn postgres_insert_static(
         tx.execute(
             &stmt,
             &[
-                &(p.mmsi as i32),
-                &(e as i32),
+                &(p.mmsi as i64),
+                &(e as i64),
                 &p.name.unwrap_or_default(),
                 &(p.ship_type as i32),
                 &p.call_sign.unwrap_or_default(),
@@ -251,36 +251,114 @@ pub fn sqlite_insert_dynamic(
 }
 
 #[cfg(feature = "postgres")]
+/// Detect which column set the ais_global_dynamic table exposes.
+///
+/// Queried per transaction (one cheap information_schema lookup per file
+/// batch); results are deliberately NOT cached process-wide, since one
+/// process may hold connections to databases with different schemas.
+fn detect_table_schema(tx: &mut PGTransaction) -> Result<String, postgres::Error> {
+    let query = "
+        SELECT
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'rot') as has_rot,
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'maneuver') as has_maneuver,
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'utc_second') as has_utc,
+            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'source') as has_source
+    ";
+
+    let row = tx.query_one(query, &[])?;
+    let has_rot: bool = row.get(0);
+    let has_maneuver: bool = row.get(1);
+    let has_utc: bool = row.get(2);
+    let has_source: bool = row.get(3);
+
+    let schema_version = if has_rot && has_maneuver && has_utc && has_source {
+        "full" // complete schema with every column
+    } else if !has_rot && has_maneuver && has_utc && has_source {
+        "norot" // schema without the rot column
+    } else {
+        "minimal" // basic 7-column schema
+    };
+
+    Ok(schema_version.to_string())
+}
+
+#[cfg(feature = "postgres")]
 /// insert position reports into database
 pub fn postgres_insert_dynamic(
     tx: &mut PGTransaction,
     msgs: Vec<VesselData>,
-    mstr: &str,
+    _mstr: &str,
     source: &str,
 ) -> Result<(), postgres::Error> {
-    // let sql = sql_from_file("new_insert_dynamic_clusteredidx.sql").replace("{}", mstr);
-    let sql = sql_from_file("new_insert_dynamic_clusteredidx.sql");
+    // Detect the table schema, then pick the matching INSERT statement
+    let schema_version = detect_table_schema(tx)?;
+
+    let sql = match schema_version.as_str() {
+        "full" => sql_from_file("new_insert_dynamic_clusteredidx.sql"),
+        "norot" => sql_from_file("new_insert_dynamic_norot.sql"),
+        _ => sql_from_file("new_insert_dynamic_minimal.sql"),
+    };
 
     let stmt = tx.prepare(&sql)?;
 
     for msg in msgs {
         let (p, e) = msg.dynamicdata();
-        let _ = tx.execute(
-            &stmt,
-            &[
-                &(p.mmsi as i32),
-                &(e as i32),
-                &(p.longitude.unwrap_or_default() as f32),
-                &(p.latitude.unwrap_or_default() as f32),
-                &(p.rot.unwrap_or_default() as f32),
-                &(p.sog_knots.unwrap_or_default() as f32),
-                &(p.cog.unwrap_or_default() as f32),
-                &(p.heading_true.unwrap_or_default() as f32),
-                &p.special_manoeuvre.unwrap_or_default(),
-                &(p.timestamp_seconds as i32),
-                &source,
-            ],
-        )?;
+
+        match schema_version.as_str() {
+            "full" => {
+                // full INSERT with every column
+                // mmsi/time are BIGINT (i64); coordinate columns are REAL (f32)
+                let _ = tx.execute(
+                    &stmt,
+                    &[
+                        &(p.mmsi as i64),
+                        &(e as i64),
+                        &(p.longitude.unwrap_or_default() as f32),
+                        &(p.latitude.unwrap_or_default() as f32),
+                        &(p.rot.unwrap_or_default() as f32),
+                        &(p.sog_knots.unwrap_or_default() as f32),
+                        &(p.cog.unwrap_or_default() as f32),
+                        &(p.heading_true.unwrap_or_default() as f32),
+                        &p.special_manoeuvre.unwrap_or_default(),
+                        &(p.timestamp_seconds as i32),
+                        &source,
+                    ],
+                )?;
+            }
+            "norot" => {
+                // INSERT without the rot column
+                let _ = tx.execute(
+                    &stmt,
+                    &[
+                        &(p.mmsi as i64),
+                        &(e as i64),
+                        &(p.longitude.unwrap_or_default() as f32),
+                        &(p.latitude.unwrap_or_default() as f32),
+                        &(p.sog_knots.unwrap_or_default() as f32),
+                        &(p.cog.unwrap_or_default() as f32),
+                        &(p.heading_true.unwrap_or_default() as f32),
+                        &p.special_manoeuvre.unwrap_or_default(),
+                        &(p.timestamp_seconds as i32),
+                        &source,
+                    ],
+                )?;
+            }
+            _ => {
+                // minimal INSERT (basic columns only)
+                let _ = tx.execute(
+                    &stmt,
+                    &[
+                        &(p.mmsi as i64),
+                        &(e as i64),
+                        &(p.longitude.unwrap_or_default() as f32),
+                        &(p.latitude.unwrap_or_default() as f32),
+                        &(p.sog_knots.unwrap_or_default() as f32),
+                        &(p.cog.unwrap_or_default() as f32),
+                        &(p.heading_true.unwrap_or_default() as f32),
+                    ],
+                )?;
+            }
+        }
     }
 
     Ok(())

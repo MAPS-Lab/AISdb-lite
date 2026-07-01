@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS ais_global_static
 (
-    mmsi           INTEGER NOT NULL,
-    time           INTEGER NOT NULL,
+    mmsi           BIGINT NOT NULL,
+    time           BIGINT NOT NULL,
     vessel_name    TEXT,
     ship_type      INTEGER,
     call_sign      TEXT,
@@ -23,11 +23,13 @@ CREATE TABLE IF NOT EXISTS ais_global_static
 );
 
 SELECT create_hypertable(
-        'ais_global_static',
-        'time',
-        partitioning_column => 'mmsi',
-        number_partitions => 4,
-        chunk_time_interval => 604800
+    'ais_global_static',
+    'time',
+    partitioning_column => 'mmsi',
+    number_partitions => 4,
+    chunk_time_interval => 604800,
+    if_not_exists => TRUE,
+    migrate_data => TRUE
 );
 
 ALTER TABLE ais_global_static SET (

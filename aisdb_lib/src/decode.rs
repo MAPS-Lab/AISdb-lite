@@ -126,7 +126,6 @@ fn is_valid_epoch(epoch: u64) -> bool {
     epoch >= min_valid_epoch && epoch <= current_time
 }
 
-
 fn extract_epoch_from_nmea_line(line: &str) -> i32 {
     // Attempt to extract Unix timestamp from additional fields after the checksum
     if let Some(checksum_index) = line.find('*') {
@@ -160,7 +159,6 @@ fn parse_headers_nmea(line: Result<String, Error>) -> Option<(String, i32)> {
     }
 }
 
-
 /// workaround for panic from nmea_parser library,
 /// caused by malformed base station timestamps / binary application messages?
 /// discards UTC date response and binary application payloads before
@@ -170,11 +168,11 @@ pub fn skipmsg(msg: &str, epoch: &i32) -> Option<(String, i32)> {
     if cols.len() < 6 {
         return Some((msg.to_string(), *epoch));
     }
-//         #[cfg(debug_assertions)]
-//         println!(
-//             "{:?} {:?} {:?} {:?} {:?} {:?}",
-//             cols[0], cols[1], cols[2], cols[3], cols[4], cols[5]
-//         );
+    //         #[cfg(debug_assertions)]
+    //         println!(
+    //             "{:?} {:?} {:?} {:?} {:?} {:?}",
+    //             cols[0], cols[1], cols[2], cols[3], cols[4], cols[5]
+    //         );
     let count = str::parse::<u8>(cols[1]).unwrap_or(1);
     let fragment_no = str::parse::<u8>(cols[2]).unwrap_or(1);
     match (cols[0], count, fragment_no, cols[3], cols[4], cols[5]) {
@@ -184,7 +182,7 @@ pub fn skipmsg(msg: &str, epoch: &i32) -> Option<(String, i32)> {
                     && (f == 1)
                     && (&tx[0..1] == ";" || &tx[0..1] == "I" || &tx[0..1] == "J"))) =>
         {
-//             println!("skipped {:?}", msg);
+            //             println!("skipped {:?}", msg);
             None
         }
         _ => Some((msg.to_string(), *epoch)),
@@ -233,19 +231,17 @@ fn decode_filter_pipe(
             reader
                 .lines()
                 .filter_map(parse_headers)
-//                 .inspect(|parsed| println!("parse_headers output: {:?}", parsed))
+                //                 .inspect(|parsed| println!("parse_headers output: {:?}", parsed))
                 .filter_map(|(s, e)| skipmsg(&s, &e))
                 .filter_map(|(s, e)| filter_vesseldata(&s, &e, &mut parser))
                 .collect::<Vec<(ParsedMessage, i32, bool)>>()
         }
-        "nmea" | "txt" | "rx" => {
-            reader
-                .lines()
-                .filter_map(parse_headers_nmea)
-                .filter_map(|(s, e)| skipmsg(&s, &e))
-                .filter_map(|(s, e)| filter_vesseldata(&s, &e, &mut parser))
-                .collect::<Vec<(ParsedMessage, i32, bool)>>()
-        }
+        "nmea" | "txt" | "rx" => reader
+            .lines()
+            .filter_map(parse_headers_nmea)
+            .filter_map(|(s, e)| skipmsg(&s, &e))
+            .filter_map(|(s, e)| filter_vesseldata(&s, &e, &mut parser))
+            .collect::<Vec<(ParsedMessage, i32, bool)>>(),
         _ => {
             // In case of unsupported file types
             Vec::new()
@@ -463,7 +459,6 @@ pub mod tests {
         );
         assert_eq!(expected, result);
     }
-
 
     #[test]
     pub fn test_decode_insert_msgs() -> Result<(), Error> {

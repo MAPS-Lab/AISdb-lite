@@ -11,7 +11,7 @@ homepage = "https://aisviz.cs.dal.ca/"
 repository = "https://github.com/AISViz/AISdb"
 tutorials = "https://aisviz.gitbook.io/tutorials/"
 documentation = "https://aisviz.gitbook.io/documentation/"
-license-file = "../LICENSE"
+license-file = "LICENSE"
 
 [features]
 default = [ "sqlite", "postgres",]
@@ -24,6 +24,10 @@ postgres = [ "dep:postgres",]
 geo = "0.26"
 geo-types = "*"
 include_dir = "0.7.2"
+md5 = "0.7"
+flate2 = "1.0"
+zip = "0.6"
+tempfile = "3.8"
 
 [dependencies.postgres]
 version = "0.19"
