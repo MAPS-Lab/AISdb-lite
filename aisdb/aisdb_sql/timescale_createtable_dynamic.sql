@@ -22,8 +22,15 @@ SELECT create_hypertable(
     partitioning_column => 'mmsi',
     number_partitions => 4,
     chunk_time_interval => 604800,
-    if_not_exists => TRUE
+    if_not_exists => TRUE,
+    migrate_data => TRUE
 );
+
+-- When a plain (non-timescale) table was migrated into a hypertable above,
+-- it lacks the generated geom column; add it before building the GiST index.
+ALTER TABLE ais_global_dynamic
+    ADD COLUMN IF NOT EXISTS geom GEOMETRY(POINT, 4326)
+    GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)) STORED;
 
 ALTER TABLE ais_global_dynamic SET (
     timescaledb.compress = false,

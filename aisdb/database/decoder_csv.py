@@ -16,49 +16,54 @@ def decode_csv_files(
     source: str,
     verbose: bool = True,
     workers: int = 4,
-) -> List[Path]:
+) -> List[str]:
     """
     Decode ExactEarth CSV files directly in Rust.
-    
+
     This is a simplified interface that uses the existing csvreader.rs.
     All heavy processing happens in Rust:
     - CSV reading
     - Column parsing
     - PostgreSQL insertion
-    
+
     Args:
         filepaths: List of CSV files to process
         dbconn: PostgreSQL connection
         source: Data source identifier
         verbose: Show progress
         workers: Number of parallel workers
-    
+
     Returns:
         List of successfully processed files
-        
+
     Example:
-        >>> conn = PostgresDBConn(host="bigdata6", user="julio", 
-        ...                       password="xxx", dbname="aisdb", port=5432)
+        >>> conn = PostgresDBConn(libpq_connstring=os.environ["AISDB_PG_DSN"])
         >>> files = ["/data/exactEarth_2020-10-01.csv"]
         >>> processed = decode_csv_files(files, conn, source="EXACTEARTH")
-        >>> print(f"Processados: {len(processed)} arquivos")
+        >>> print(f"Processed {len(processed)} files")
     """
-    # Convert to Path
-    filepaths = [Path(f) if isinstance(f, str) else f for f in filepaths]
-    
+    # The Rust decoder expects plain string paths
+    raw_files = [str(f) for f in filepaths]
+
     # Call existing Rust decoder
     # decoder() already identifies CSV and calls postgres_decodemsgs_ee_csv
     processed = decoder(
         dbpath="",  # Empty string = use Postgres only
         psql_conn_string=dbconn.connection_string,
-        files=filepaths,
+        files=raw_files,
         source=source,
         verbose=verbose,
         workers=workers,
         allow_swap=False,
         type_preference="csv",  # Force CSV processing
     )
-    
+
+    if raw_files and not processed:
+        raise RuntimeError(
+            f"decoder failed for all {len(raw_files)} CSV files; "
+            "see stderr for per-file errors"
+        )
+
     return processed
 
 
@@ -73,20 +78,14 @@ Simplified CSV Decoder
 
 USAGE:
 ------
-from aisdb.decoder_csv import decode_csv_files
+from aisdb.database.decoder_csv import decode_csv_files
 from aisdb.database.dbconn import PostgresDBConn
 
-# Connect
-conn = PostgresDBConn(
-    host="bigdata6",
-    user="julio", 
-    password="password",
-    dbname="aisdb_brin_2weeks_robust",
-    port=5432
-)
+# Connect (credentials via environment, never hardcoded)
+conn = PostgresDBConn(libpq_connstring=os.environ["AISDB_PG_DSN"])
 
 # Process CSV
-files = ["/meridian/ais_archive/meridian/202010/exactEarth_historical_data_2020-10-01.csv"]
+files = ["/data/exactEarth_historical_data_2020-10-01.csv"]
 processed = decode_csv_files(files, conn, source="EXACTEARTH")
 
 PROCESSING (100% in Rust):
@@ -99,11 +98,11 @@ PROCESSING (100% in Rust):
 6. Batch insert (50k records) into PostgreSQL
 7. Return list of processed files
 
-VANTAGENS:
-----------
-✓ TODO processamento em Rust (rápido)
-✓ Usa csvreader.rs existente (testado)
-✓ Suporta workers paralelos
-✓ Baixo uso de memória
-✓ API Python simples
+ADVANTAGES:
+-----------
+- All processing in Rust (fast)
+- Reuses the existing, tested csvreader.rs
+- Parallel workers supported
+- Low memory footprint
+- Simple Python API
     """)

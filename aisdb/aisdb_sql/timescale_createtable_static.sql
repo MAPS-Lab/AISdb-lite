@@ -28,7 +28,8 @@ SELECT create_hypertable(
     partitioning_column => 'mmsi',
     number_partitions => 4,
     chunk_time_interval => 604800,
-    if_not_exists => TRUE
+    if_not_exists => TRUE,
+    migrate_data => TRUE
 );
 
 ALTER TABLE ais_global_static SET (
