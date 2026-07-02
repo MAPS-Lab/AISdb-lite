@@ -397,7 +397,9 @@ fn handle_websocket_client(
                     //#[cfg(debug_assertions)]
                     //println!("RX: {}", String::from_utf8_lossy(&buf[0..count_input]));
                     if let Err(e) = websocket.send(Message::Text(
-                        String::from_utf8(buf[0..count_input].to_vec()).unwrap(),
+                        String::from_utf8(buf[0..count_input].to_vec())
+                            .unwrap()
+                            .into(),
                     )) {
                         eprintln!("dropping client: {} {}", remote_addr, e);
                         return;
@@ -511,17 +513,16 @@ pub fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::read;
     use std::fs::read_to_string;
     use std::path::PathBuf;
 
     #[test]
     fn test_receiver() {
-        //let test_out_tcp: Result<SocketAddr, AddrParseError> = "localhost:9922".parse();
+        let rawdata_addr = "127.0.0.1:9923";
         let args: ReceiverArgs = ReceiverArgs {
             dynamic_msg_bufsize: Some(8),
             multicast_addr_parsed: None,
-            multicast_addr_rawdata: Some("localhost:9921".to_string()),
+            multicast_addr_rawdata: Some(rawdata_addr.to_string()),
             postgres_connection_string: None,
             static_msg_bufsize: Some(1),
             tcp_connect_addr: None,
@@ -529,15 +530,21 @@ mod tests {
             tcp_output_addr: None,
             tee: Some(false),
             udp_listen_addr: Some(DEFAULT_UDP_LISTEN_ADDR.to_string()),
-            //udp_output_addr: Some("localhost:9921".to_string()),
             udp_output_addr: None,
         };
+
+        // bind the downstream listener before the receiver starts forwarding
+        let test_downstream =
+            mproxy_server::upstream_socket_interface(rawdata_addr.to_string()).unwrap();
+
         let threads = start_receiver(args);
+        std::thread::sleep(std::time::Duration::from_millis(200));
 
         let testfile = PathBuf::from("../aisdb/tests/testdata/test_data_20211101.nm4");
 
-        // skip message header while reading: assume timestamps are incoming live
-        let testfile_bytes: Vec<u8> = read_to_string(&testfile)
+        // skip message headers while reading: assume timestamps are incoming
+        // live. Keep the payload inside a single UDP datagram.
+        let payload: Vec<u8> = read_to_string(&testfile)
             .unwrap()
             .lines()
             .filter_map(|l| {
@@ -546,52 +553,31 @@ mod tests {
                 splits.next()?;
                 Some(splits.next()?.as_bytes().to_vec())
             })
+            .take(20)
             .reduce(|mut a, mut b| {
-                a.append(&mut b);
                 a.push(b'\r');
                 a.push(b'\n');
+                a.append(&mut b);
                 a
             })
             .unwrap();
-        //.collect();
-        let test_downstream =
-            mproxy_server::upstream_socket_interface("localhost:9922".to_string()).unwrap();
+        assert!(payload.len() < BUFSIZE, "payload must fit one datagram");
+
         let test_upstream =
-            mproxy_client::target_socket_interface(&DEFAULT_UDP_LISTEN_ADDR.to_string()).unwrap();
+            mproxy_client::target_socket_interface(&"127.0.0.1:9921".to_string()).unwrap();
+        test_upstream.1.send_to(&payload, test_upstream.0).unwrap();
 
-        /*
-        let test_upstream_client = mproxy_client::client_socket_stream(
-        &testfile,
-        vec![DEFAULT_UDP_LISTEN_ADDR.to_string()],
-        false,
-        )
-        .unwrap();
-        */
-
-        let mut buf: Vec<u8> = Vec::new();
-
-        test_upstream
+        // the raw input copy must arrive unmodified on the rawdata channel
+        test_downstream
             .1
-            .send_to(&testfile_bytes, test_upstream.0)
+            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
             .unwrap();
-
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-
-        //let _bytes_read = test_downstream.1.recv_from(&mut buf).unwrap();
-        let _bytes_read = test_downstream.1.recv(&mut buf).unwrap();
-        eprintln!("TRACER2");
-
-        std::mem::drop(test_downstream);
-        //std::mem::drop(test_upstream_client);
+        let mut buf = vec![0u8; BUFSIZE];
+        let received = test_downstream.1.recv(&mut buf).unwrap();
+        assert_eq!(&payload[..], &buf[..received]);
 
         for thread in threads {
-            //thread.join().unwrap();
             assert!(!thread.is_finished());
         }
-
-        let original_input = read(testfile).unwrap();
-        assert_eq!(original_input, buf);
-
-        //panic!("{}", String::from_utf8_lossy(&buf));
     }
 }
