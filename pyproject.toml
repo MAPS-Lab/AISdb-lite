@@ -8,7 +8,7 @@ requires-python = ">=3.8"
 requires-dist = ["maturin>=1.0", "numpy", "wheel"]
 dependencies = [
     "packaging", "pillow", "requests", "selenium", "shapely",
-    "python-dateutil", "orjson", "websockets", "beautifulsoup4", "pyproj", "py7zr",
+    "python-dateutil", "beautifulsoup4", "pyproj", "py7zr",
     "toml", "tqdm", "numpy", "webdriver-manager", "psycopg", "psycopg[binary]", "scipy",
     "geopandas", "xarray", "cfgrib", "h3", "matplotlib", "cdsapi",
 ]
@@ -18,10 +18,10 @@ readme = "README.md"
 description = "Smart AIS data storage and integration"
 classifiers = [
     "Operating System :: POSIX :: Linux", "Programming Language :: Python :: 3.8", "Programming Language :: Python :: 3.9",
-    "Topic :: Scientific/Engineering :: Information Analysis", "Topic :: Utilities", "Programming Language :: JavaScript",
+    "Topic :: Scientific/Engineering :: Information Analysis", "Topic :: Utilities",
     "Topic :: Scientific/Engineering :: GIS", "Intended Audience :: Developers", "Intended Audience :: Science/Research",
     "Programming Language :: SQL", "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-    "Topic :: Database :: Database Engines/Servers", "Topic :: Database :: Front-Ends",
+    "Topic :: Database :: Database Engines/Servers",
     "Programming Language :: Python :: 3.10", "Programming Language :: Rust"
 ]
 
@@ -45,11 +45,9 @@ devel = []
 
 [tool.maturin]
 include = [
-    "aisdb_web/dist_map_bingmaps/favicon.svg", "aisdb_web/dist_map_bingmaps/index.html",
     "pyproject.toml", "aisdb/*.py", "aisdb/aisdb_sql/*.sql", "aisdb/database/*.py", "aisdb/tests/*.py",
-    "aisdb_lib/*", "aisdb_web/dist_map/assets/*", "aisdb_web/dist_map/favicon.png", "aisdb_web/dist_map/favicon.svg",
+    "aisdb_lib/*",
     "aisdb/tests/testdata/test_data_20210701.csv", "aisdb/tests/testdata/test_data_20211101.nm4", "aisdb/webdata/*.py",
-    "aisdb_web/dist_map/index.html", "aisdb_web/dist_map_bingmaps/assets/*", "aisdb_web/dist_map_bingmaps/favicon.png"
 ]
 bindings = "pyo3"
 

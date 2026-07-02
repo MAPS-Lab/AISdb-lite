@@ -45,11 +45,6 @@
 aisdb.egg-info
 aisdb/tests/test_zones/East_Coast_EEZ_Zones_4_25_22
 aisdb_lib/testdata
-aisdb_web/dist_cargodoc
-aisdb_web/dist_jsdoc
-aisdb_web/dist_map
-aisdb_web/dist_map_bingmaps
-aisdb_web/node_modules
 build
 diffstat.sh
 docker-compose.override.yml

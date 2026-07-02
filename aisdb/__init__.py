@@ -5,13 +5,11 @@ import warnings
 import toml
 
 with open(
-        os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                     'pyproject.toml'), 'r') as tomlfile:
-    __version__ = toml.load(tomlfile).get('project').get('version')
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "pyproject.toml"), "r"
+) as tomlfile:
+    __version__ = toml.load(tomlfile).get("project").get("version")
 
-sqlpath = os.path.abspath(os.path.join(os.path.dirname(__file__), 'aisdb_sql'))
-
-import aisdb.web_interface
+sqlpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "aisdb_sql"))
 
 from .database.decoder import decode_msgs
 
@@ -42,7 +40,8 @@ from .gis import (
 )
 
 from .interp import (
-    interp_time, )
+    interp_time,
+)
 
 from .network_graph import graph
 
@@ -62,15 +61,13 @@ from .track_gen import (
 from .denoising_encoder import (
     encode_score,
     encode_greatcircledistance,
-    remove_pings_wrt_speed
+    remove_pings_wrt_speed,
 )
 
 from .weather.data_store import WeatherDataStore
 from .discretize.h3 import Discretizer
 
-LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO')
-logging.basicConfig(format='%(message)s',
-                    level=LOGLEVEL,
-                    datefmt='%Y-%m-%d %I:%M:%S')
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO")
+logging.basicConfig(format="%(message)s", level=LOGLEVEL, datefmt="%Y-%m-%d %I:%M:%S")
 
 from .ports.api import WorldPortIndexClient

@@ -57,17 +57,6 @@ jobs:
           override: true
           cache: true
 
-      - name: Install wasm-pack
-        run: |
-          cargo install --locked wasm-pack --verbose
-          cargo install --locked wasm-bindgen-cli --verbose
-          cargo install --locked wasm-opt --verbose
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Skip DB setup on Windows
         run: |
           echo "Skipping PostgreSQL/PostGIS setup on Windows (Docker images are Linux-only)."
@@ -86,15 +75,11 @@ jobs:
         run: |
           . AISdb\Scripts\Activate.ps1
           pytest ./aisdb/tests/ \
-            --ignore=./aisdb/tests/test_001_postgres.py \
             --ignore=./aisdb/tests/test_001_postgres_global.py \
-            --ignore=./aisdb/tests/test_002_decode.py \
             --ignore=./aisdb/tests/test_002_decode_global.py \
-            --ignore=./aisdb/tests/test_005_dbqry.py \
             --ignore=./aisdb/tests/test_005_dbqry_postgres.py \
             --ignore=./aisdb/tests/test_007_trackgen.py \
             --ignore=./aisdb/tests/test_008_interp.py \
-            --ignore=./aisdb/tests/test_011_ui.py \
             --ignore=./aisdb/tests/test_013_proc_util.py \
             --ignore=./aisdb/tests/test_014_marinetraffic.py \
             --maxfail=10
@@ -138,13 +123,6 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           source $HOME/.cargo/env
       
-      - name: Install wasm-pack
-        run: |
-          cargo install --locked wasm-pack --verbose
-          cargo install --locked wasm-bindgen-cli --verbose
-          cargo install --locked wasm-opt --verbose
-          wasm-pack --version
-          
       - name: Setup PostgreSQL 17
         uses: ikalnytskyi/action-setup-postgres@v7
         with:
@@ -258,26 +236,11 @@ jobs:
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           source $HOME/.cargo/env
       
-      - name: Install LLVM and Configure clang
-        run: |
-          brew install llvm
-          export PATH="$(brew --prefix llvm)/bin:$PATH"
-          export CC="$(brew --prefix llvm)/bin/clang --target=wasm32-unknown-unknown"
-          echo "export PATH=$PATH" >> $GITHUB_ENV
-          echo "CC=$CC" >> $GITHUB_ENV
-      
       - name: Install zlib and Ensure pkg-config is Correctly Configured
         run: |
           brew install zlib
           export PKG_CONFIG_PATH=$(brew --prefix zlib)/lib/pkgconfig
           echo "export PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-      - name: Install wasm-pack
-        run: |
-          cargo install --locked wasm-pack --verbose
-          cargo install --locked wasm-bindgen-cli --verbose
-          cargo install --locked wasm-opt --verbose
-          wasm-pack --version
 
       - name: Install PostgreSQL
         run: |
@@ -384,16 +347,6 @@ jobs:
           restore-keys: |
             cargo-${{ runner.os }}-
       
-      - name: Install Rust Target for wasm
-        run: |
-          rustup target add wasm32-unknown-unknown
-            
-      - name: install wasm-pack
-        run: |
-          cargo install --locked wasm-pack --verbose
-          cargo install --locked wasm-bindgen-cli --verbose
-          cargo install --locked wasm-opt --verbose
-          wasm-pack --version
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -419,10 +372,6 @@ jobs:
         target: [ x64, x86 ]
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -435,11 +384,6 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
-      - name: Install wasm-pack
-        run: |
-          cargo install --locked wasm-pack --verbose
-          cargo install --locked wasm-bindgen-cli --verbose
-          cargo install --locked wasm-opt --verbose
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -477,26 +421,11 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
-      - name: Install LLVM and Configure clang
-        run: |
-          brew install llvm
-          export PATH="$(brew --prefix llvm)/bin:$PATH"
-          export CC="$(brew --prefix llvm)/bin/clang --target=wasm32-unknown-unknown"
-          echo "export PATH=$PATH" >> $GITHUB_ENV
-          echo "CC=$CC" >> $GITHUB_ENV
       - name: Install zlib and Ensure pkg-config is Correctly Configured
         run: |
           brew install zlib
           export PKG_CONFIG_PATH=$(brew --prefix zlib)/lib/pkgconfig
           echo "export PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-      - name: Install Rust Target for wasm
-        run: |
-          rustup target add wasm32-unknown-unknown        
-      - name: Install wasm-pack
-        run: |
-          cargo install --locked wasm-pack --verbose
-          cargo install --locked wasm-bindgen-cli --verbose
-          cargo install --locked wasm-opt --verbose
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:

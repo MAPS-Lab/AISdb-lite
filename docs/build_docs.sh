@@ -3,10 +3,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 ROOTDIR="${SCRIPTPATH}/.."
 PKGDIR="${ROOTDIR}/aisdb"
 RSTSOURCEDIR="${ROOTDIR}/docs/source"
-#MAPDIR="${ROOTDIR}/aisdb_web/map"
 SPHINXDIR="${ROOTDIR}/docs/dist_sphinx"
-#CARGODIR="${ROOTDIR}/aisdb_web/dist_cargodoc"
-#WASMDIR="${ROOTDIR}/aisdb_wasm"
 #COVERAGEDIR="${ROOTDIR}/docs/dist_coverage"
 
 set -e

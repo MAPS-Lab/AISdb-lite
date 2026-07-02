@@ -44,16 +44,6 @@ jobs:
                 echo "finished apt install"
             fi
       
-      - name: Install Rust Target for wasm
-        run: |
-          rustup target add wasm32-unknown-unknown
-            
-      - name: install wasm-pack
-        run: |
-          cargo install --locked wasm-pack --verbose
-          cargo install --locked wasm-bindgen-cli --verbose
-          cargo install --locked wasm-opt --verbose
-          wasm-pack --version
       
       - name: Build AISdb
         run: |

@@ -14,11 +14,10 @@ Decoding and insertion run in Rust (`aisdb_lib`); the Python package (`aisdb`) p
 The build requires the following.
 
 - Python 3.10-3.12
-- Rust toolchain via rustup, with the `wasm32-unknown-unknown` target and `wasm-pack` (the wheel build embeds the web assets)
+- Rust toolchain via rustup
 - PostgreSQL with the TimescaleDB and PostGIS extensions
 
 ```bash
-rustup target add wasm32-unknown-unknown
 python -m venv .venv && source .venv/bin/activate
 pip install maturin
 maturin develop            # or: maturin build --release
