@@ -3,13 +3,26 @@ from datetime import datetime, timedelta
 
 from shapely.geometry import Polygon
 
-from aisdb import (DBConn, DBQuery, Domain, PostgresDBConn, sqlfcn, sqlfcn_callbacks, )
+from aisdb import (
+    DBConn,
+    DBQuery,
+    Domain,
+    PostgresDBConn,
+    sqlfcn,
+    sqlfcn_callbacks,
+)
 from aisdb.database.decoder import decode_msgs
-from aisdb.tests.create_testing_data import (sample_database_file, sample_gulfstlawrence_bbox, )
+from aisdb.tests.create_testing_data import (
+    sample_database_file,
+    sample_gulfstlawrence_bbox,
+)
 from aisdb.track_gen import TrackGen
 
-conn_information = (f"postgresql://{os.environ['pguser']}:{os.environ['pgpass']}@"
-                    f"{os.environ['pghost']}:5432/{os.environ['pguser']}")
+conn_information = (
+    f"postgresql://{os.environ['pguser']}:{os.environ['pgpass']}@"
+    f"{os.environ['pghost']}:5432/{os.environ['pguser']}"
+)
+
 
 def test_postgres():
     # keyword arguments
@@ -19,9 +32,12 @@ def test_postgres():
         res = cur.fetchall()
         print(res)
 
+
 # CSV ingestion to global hypertables
 def test_create_from_CSV_postgres_global(tmpdir):
-    testingdata_csv = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20210701.csv")
+    testingdata_csv = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20210701.csv"
+    )
     with PostgresDBConn(conn_information) as dbconn:
         decode_msgs(
             dbconn=dbconn,
@@ -40,11 +56,95 @@ def test_create_from_CSV_postgres_global(tmpdir):
         tables = [row["table_name"] for row in cur.fetchall()]
         assert "ais_global_dynamic" in tables
 
+
+def test_create_from_CSV_postgres_plain(tmpdir):
+    # non-timescale ingest path: plain global tables, checksum handling on
+    testingdata_csv = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20210701.csv"
+    )
+    with PostgresDBConn(conn_information) as dbconn:
+        decode_msgs(
+            dbconn=dbconn,
+            filepaths=[testingdata_csv],
+            source="TESTING",
+            vacuum=False,
+        )
+        cur = dbconn.cursor()
+        cur.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'public' ORDER BY table_name;"
+        )
+        tables = [row["table_name"] for row in cur.fetchall()]
+        assert "ais_global_dynamic" in tables
+        # Read back ingested rows: table existence alone cannot catch a
+        # silently failing insert path.
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM ais_global_dynamic WHERE source = 'TESTING';"
+        )
+        assert cur.fetchone()["n"] > 0, "no rows ingested into ais_global_dynamic"
+        cur.execute(
+            """
+            DROP TABLE IF EXISTS ais_202107_dynamic CASCADE;
+            DROP TABLE IF EXISTS ais_202107_static CASCADE;
+            DROP TABLE IF EXISTS static_202107_aggregate CASCADE;
+            """
+        )
+
+
+def test_create_from_CSV_postgres_timescaledb_indexes(tmpdir):
+    testingdata_csv = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20210701.csv"
+    )
+    with PostgresDBConn(conn_information) as dbconn:
+        decode_msgs(
+            dbconn=dbconn,
+            filepaths=[testingdata_csv],
+            source="TESTING",
+            vacuum=False,
+            skip_checksum=True,
+            raw_insertion=True,
+            timescaledb=True,
+        )
+        cur = dbconn.cursor()
+        cur.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'public' ORDER BY table_name;"
+        )
+        tables = [row["table_name"] for row in cur.fetchall()]
+        # TimescaleDB ingestion targets the global hypertables (no per-month tables)
+        assert "ais_global_dynamic" in tables
+        assert "ais_global_static" in tables
+
+        # Read back ingested rows through the hypertable
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM ais_global_dynamic WHERE source = 'TESTING';"
+        )
+        assert cur.fetchone()["n"] > 0, "no rows ingested into ais_global_dynamic"
+
+        # The BRIN time index and GiST geom index must exist on the hypertable
+        cur.execute("""
+            SELECT indexname, indexdef
+            FROM pg_indexes
+            WHERE tablename = 'ais_global_dynamic';
+        """)
+        indexes = {row["indexname"]: row["indexdef"] for row in cur.fetchall()}
+        assert any("brin" in indexdef.lower() for indexdef in indexes.values()), (
+            f"BRIN index missing on ais_global_dynamic: {sorted(indexes)}"
+        )
+        assert any("gist" in indexdef.lower() for indexdef in indexes.values()), (
+            f"GiST geom index missing on ais_global_dynamic: {sorted(indexes)}"
+        )
+
+
 def test_decode_1day_postgres_global(tmpdir):
     filepaths = [
         os.path.join(os.path.dirname(__file__), "testdata", f)
-        for f in ["test_data_20210701.csv", "test_data_20211101.nm4", 
-                  "test_data_20211101.nm4.gz", "test_data_20211101.nm4.zip"]
+        for f in [
+            "test_data_20210701.csv",
+            "test_data_20211101.nm4",
+            "test_data_20211101.nm4.gz",
+            "test_data_20211101.nm4.zip",
+        ]
     ]
 
     with PostgresDBConn(conn_information) as dbconn:
@@ -57,17 +157,22 @@ def test_decode_1day_postgres_global(tmpdir):
             verbose=True,
             skip_checksum=True,
             raw_insertion=True,
-            timescaledb=True
+            timescaledb=True,
         )
 
         delta = datetime.now() - dt
         print(f"postgres total parse and insert time: {delta.total_seconds():.2f}s")
 
+
 def test_sql_query_strings_postgres_global(tmpdir):
     filepaths = [
         os.path.join(os.path.dirname(__file__), "testdata", f)
-        for f in ["test_data_20210701.csv", "test_data_20211101.nm4", 
-                  "test_data_20211101.nm4.gz", "test_data_20211101.nm4.zip"]
+        for f in [
+            "test_data_20210701.csv",
+            "test_data_20211101.nm4",
+            "test_data_20211101.nm4.gz",
+            "test_data_20211101.nm4.zip",
+        ]
     ]
 
     start = datetime(2021, 7, 1)
@@ -76,20 +181,42 @@ def test_sql_query_strings_postgres_global(tmpdir):
     domain = Domain("gulf domain", zones=[{"name": "z1", "geometry": z1}])
 
     with PostgresDBConn(conn_information) as aisdatabase:
-        decode_msgs(filepaths=filepaths, dbconn=aisdatabase, source="TESTING", vacuum=True, verbose=True,
-                    skip_checksum=True, raw_insertion=True, timescaledb=True)
+        decode_msgs(
+            filepaths=filepaths,
+            dbconn=aisdatabase,
+            source="TESTING",
+            vacuum=True,
+            verbose=True,
+            skip_checksum=True,
+            raw_insertion=True,
+            timescaledb=True,
+        )
 
         for callback in [
             sqlfcn_callbacks.in_time_bbox_inmmsi_geom,
-            sqlfcn_callbacks.in_timerange, sqlfcn_callbacks.in_timerange_hasmmsi,
-            sqlfcn_callbacks.in_timerange_validmmsi, sqlfcn_callbacks.in_bbox_geom, sqlfcn_callbacks.in_bbox_time_geom,
+            sqlfcn_callbacks.in_timerange,
+            sqlfcn_callbacks.in_timerange_hasmmsi,
+            sqlfcn_callbacks.in_timerange_validmmsi,
+            sqlfcn_callbacks.in_bbox_geom,
+            sqlfcn_callbacks.in_bbox_time_geom,
             sqlfcn_callbacks.in_bbox_time_validmmsi_geom,
         ]:
             rowgen = DBQuery(
-                dbconn=aisdatabase, start=start, end=end, **domain.boundary,
-                callback=callback, mmsi=316000000, mmsis=[316000000, 316000001]
+                dbconn=aisdatabase,
+                start=start,
+                end=end,
+                **domain.boundary,
+                callback=callback,
+                mmsi=316000000,
+                mmsis=[316000000, 316000001],
             ).gen_qry(fcn=sqlfcn.crawl_dynamic_static)
             next(rowgen)
+
+        # exercise the global-table maintenance helpers
+        aisdatabase.rebuild_indexes(timescaledb=True, verbose=False)
+        aisdatabase.deduplicate_dynamic_msgs(timescaledb=True, verbose=True)
+        aisdatabase.deduplicate_dynamic_msgs(timescaledb=True, verbose=False)
+
 
 # def test_noaa_data_ingest_postgres_only(tmpdir):
 #     testdatacsv = os.path.join(os.path.dirname(__file__), "testdata", "test_data_noaa_20230101.csv")

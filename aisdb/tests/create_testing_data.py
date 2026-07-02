@@ -3,24 +3,9 @@ import os
 import numpy as np
 from shapely.geometry import Polygon
 
-from aisdb.database.create_tables import (sql_createtable_dynamic, sql_createtable_static, )
 from aisdb.gis import Domain
 from aisdb.database.dbconn import PostgresDBConn
 from aisdb.database.decoder import decode_msgs
-
-
-def sample_dynamictable_insertdata(*, dbconn):
-    # db = DBConn()
-    assert isinstance(dbconn, DBConn)
-    dbconn.execute(sql_createtable_static.format(month="200001"))
-    dbconn.execute(sql_createtable_dynamic.format(month="200001"))
-    dbconn.execute(
-        "INSERT OR IGNORE INTO ais_200001_dynamic (mmsi, time, longitude, latitude, cog, sog) VALUES (000000001, 946702800, -60.994833, 47.434647238127695, -1, -1)")
-    dbconn.execute(
-        "INSERT OR IGNORE INTO ais_200001_dynamic (mmsi, time, longitude, latitude, cog, sog) VALUES (000000001, 946702820, -60.994833, 47.434647238127695, -1, -1)")
-    dbconn.execute(
-        "INSERT OR IGNORE INTO ais_200001_dynamic (mmsi, time, longitude, latitude, cog, sog) VALUES (000000001, 946702840, -60.994833, 47.434647238127695, -1, -1)")
-    dbconn.commit()
 
 
 def sample_random_polygon(xscale=50, yscale=50):
@@ -43,15 +28,29 @@ def sample_random_polygon(xscale=50, yscale=50):
 
 
 def sample_gulfstlawrence_bbox():
-    gulfstlawrence_bbox_xy = np.array([(-71.64440346704974, 43.18445256159233), (-71.2966623933639, 52.344721551389526),
-        (-51.2146153880073, 51.68484191466307), (-50.345262703792734, 42.95158299927571),
-        (-71.64440346704974, 43.18445256159233), ])
+    gulfstlawrence_bbox_xy = np.array(
+        [
+            (-71.64440346704974, 43.18445256159233),
+            (-71.2966623933639, 52.344721551389526),
+            (-51.2146153880073, 51.68484191466307),
+            (-50.345262703792734, 42.95158299927571),
+            (-71.64440346704974, 43.18445256159233),
+        ]
+    )
     return gulfstlawrence_bbox_xy.T
 
 
 def random_polygons_domain(count=10):
-    return Domain("testdomain", [{"name": f"random_{i:03}", "geometry": Polygon(zip(*sample_random_polygon()))} for i in
-        range(count)])
+    return Domain(
+        "testdomain",
+        [
+            {
+                "name": f"random_{i:03}",
+                "geometry": Polygon(zip(*sample_random_polygon())),
+            }
+            for i in range(count)
+        ],
+    )
 
 
 def sample_database_file(postgres_conn_string):
@@ -71,7 +70,7 @@ def sample_database_file(postgres_conn_string):
             skip_checksum=True,
             raw_insertion=True,
             timescaledb=True,
-            verbose=True
+            verbose=True,
         )
         dbconn.aggregate_static_msgs(verbose=True)
         dbconn.commit()
