@@ -7,10 +7,8 @@ name = "aisdb"
 requires-python = ">=3.8"
 requires-dist = ["maturin>=1.0", "numpy", "wheel"]
 dependencies = [
-    "packaging", "pillow", "requests", "selenium", "shapely",
-    "python-dateutil", "beautifulsoup4", "pyproj", "py7zr",
-    "toml", "tqdm", "numpy", "webdriver-manager", "psycopg", "psycopg[binary]", "scipy",
-    "geopandas", "xarray", "cfgrib", "h3", "matplotlib", "cdsapi",
+    "numpy", "psycopg[binary]", "pyproj", "python-dateutil",
+    "scipy", "shapely", "toml",
 ]
 zip-safe = false
 version = "1.8.0-alpha"
@@ -39,7 +37,14 @@ tutorials = "https://aisviz.gitbook.io/tutorials/"
 documentation = "https://aisviz.gitbook.io/documentation/"
 
 [project.optional-dependencies]
-test = ["coverage", "pytest", "pytest-cov", "pytest-dotenv"]
+# feature extras matching the lazily-loaded modules in aisdb/__init__.py
+scraping = ["selenium", "webdriver-manager", "beautifulsoup4", "requests"]
+weather = ["xarray", "cfgrib", "cdsapi"]
+discretize = ["h3", "matplotlib", "geopandas"]
+rasters = ["pillow", "py7zr", "requests", "tqdm"]
+ports = ["pandas", "requests"]
+all = ["aisdb[scraping,weather,discretize,rasters,ports]"]
+test = ["coverage", "pytest", "pytest-cov", "pytest-dotenv", "aisdb[all]"]
 docs = ["sphinx", "sphinx-rtd-theme"]
 devel = []
 

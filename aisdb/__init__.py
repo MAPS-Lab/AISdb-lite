@@ -1,6 +1,6 @@
+import importlib
 import logging
 import os
-import warnings
 
 import toml
 
@@ -21,10 +21,6 @@ from .database import sqlfcn
 
 from .database import sqlfcn_callbacks
 
-from .webdata.bathymetry import Gebco
-
-from .webdata.shore_dist import ShoreDist, PortDist
-
 from .gis import (
     Domain,
     DomainFromTxts,
@@ -42,8 +38,6 @@ from .gis import (
 from .interp import (
     interp_time,
 )
-
-from .network_graph import graph
 
 from .receiver import start_receiver
 
@@ -64,10 +58,34 @@ from .denoising_encoder import (
     remove_pings_wrt_speed,
 )
 
-from .weather.data_store import WeatherDataStore
-from .discretize.h3 import Discretizer
+# Optional feature modules are resolved lazily (PEP 562) so that a bare
+# ``import aisdb`` does not require their heavy dependencies (selenium,
+# xarray/cdsapi, h3/matplotlib/geopandas, pillow/py7zr). Install the
+# matching extra from pyproject.toml to use them.
+_LAZY_ATTRIBUTES = {
+    "Gebco": "aisdb.webdata.bathymetry",
+    "ShoreDist": "aisdb.webdata.shore_dist",
+    "PortDist": "aisdb.webdata.shore_dist",
+    "CoastDist": "aisdb.webdata.shore_dist",
+    "graph": "aisdb.network_graph",
+    "WeatherDataStore": "aisdb.weather.data_store",
+    "Discretizer": "aisdb.discretize.h3",
+    "WorldPortIndexClient": "aisdb.ports.api",
+}
+
+
+def __getattr__(name):
+    if name in _LAZY_ATTRIBUTES:
+        module = importlib.import_module(_LAZY_ATTRIBUTES[name])
+        attribute = getattr(module, name)
+        globals()[name] = attribute
+        return attribute
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | set(_LAZY_ATTRIBUTES))
+
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "INFO")
 logging.basicConfig(format="%(message)s", level=LOGLEVEL, datefmt="%Y-%m-%d %I:%M:%S")
-
-from .ports.api import WorldPortIndexClient

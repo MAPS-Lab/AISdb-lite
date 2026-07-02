@@ -23,6 +23,23 @@ pip install maturin
 maturin develop            # or: maturin build --release
 ```
 
+The core install covers decode, ingest, and query. Optional feature sets are
+packaged as extras and imported lazily, so their dependencies are only needed
+when the feature is used.
+
+| Extra | Enables | Pulls in |
+|-------|---------|----------|
+| `scraping` | `DBQuery.check_marinetraffic`, vessel metadata scraping | selenium, webdriver-manager, beautifulsoup4 |
+| `weather` | `aisdb.WeatherDataStore` (ERA5 at track positions) | xarray, cfgrib, cdsapi |
+| `discretize` | `aisdb.Discretizer` (H3 hex indexing) | h3, matplotlib, geopandas |
+| `rasters` | `aisdb.Gebco`, `ShoreDist`, `PortDist`, `InlandDenoising` | pillow, py7zr, requests, tqdm |
+| `ports` | `aisdb.WorldPortIndexClient` | pandas, requests |
+| `all` | everything above | |
+
+```bash
+pip install 'aisdb[weather,discretize]'   # pick what you need
+```
+
 ## Quick start
 
 ```python

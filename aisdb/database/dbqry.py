@@ -12,7 +12,6 @@ import psycopg
 
 from aisdb.database import sqlfcn, sqlfcn_callbacks
 from aisdb.database.dbconn import PostgresDBConn
-from aisdb.webdata.marinetraffic import VesselInfo
 
 
 class DBQuery(UserDict):
@@ -135,6 +134,9 @@ class DBQuery(UserDict):
                 if using :class:`aisdb.gis.Domain`, the `Domain.boundary`
                 attribute can be supplied here
         """
+        # deferred import: pulls selenium only when scraping is requested
+        from aisdb.webdata.marinetraffic import VesselInfo
+
         vinfo = VesselInfo(trafficDBpath)
 
         print("retrieving vessel info ", end="", flush=True)
