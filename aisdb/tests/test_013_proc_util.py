@@ -8,7 +8,6 @@ from aisdb.database import sqlfcn
 from aisdb.database.dbconn import PostgresDBConn
 from aisdb.database.dbqry import DBQuery
 from aisdb.tests.create_testing_data import sample_database_file
-from aisdb.webdata.marinetraffic import vessel_info, VesselInfo
 
 POSTGRES_CONN_STRING = (f"postgresql://{os.environ['pguser']}:{os.environ['pgpass']}@"
                     f"{os.environ['pghost']}:5432/{os.environ['pguser']}")

@@ -8,7 +8,7 @@ requires-python = ">=3.8"
 requires-dist = ["maturin>=1.0", "numpy", "wheel"]
 dependencies = [
     "numpy", "psycopg[binary]", "pyproj", "python-dateutil",
-    "scipy", "shapely", "toml",
+    "scipy", "shapely",
 ]
 zip-safe = false
 version = "1.8.0-alpha"
@@ -50,7 +50,7 @@ devel = []
 
 [tool.maturin]
 include = [
-    "pyproject.toml", "aisdb/*.py", "aisdb/aisdb_sql/*.sql",
+    "aisdb/*.py", "aisdb/aisdb_sql/*.sql",
     "aisdb/database/*.py", "aisdb/webdata/*.py", "aisdb/weather/*",
     "aisdb/discretize/*.py", "aisdb/ports/*.py",
     "aisdb_lib/*", "receiver/*",

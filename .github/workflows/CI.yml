@@ -81,7 +81,6 @@ jobs:
             --ignore=./aisdb/tests/test_007_trackgen.py \
             --ignore=./aisdb/tests/test_008_interp.py \
             --ignore=./aisdb/tests/test_013_proc_util.py \
-            --ignore=./aisdb/tests/test_014_marinetraffic.py \
             --maxfail=10
 
       - name: Clean Up
@@ -195,7 +194,7 @@ jobs:
       - name: Run Tests
         run: |
           source ./AISdb/bin/activate
-          pytest ./aisdb/tests/ --ignore=./aisdb/tests/test_014_marinetraffic.py --maxfail=10
+          pytest ./aisdb/tests/ --maxfail=10
       
       - name: Clean Up
         run: |
@@ -299,7 +298,7 @@ jobs:
       - name: Run Tests
         run: |
           source ./AISdb/bin/activate
-          pytest ./aisdb/tests/ --ignore=./aisdb/tests/test_014_marinetraffic.py --maxfail=10
+          pytest ./aisdb/tests/ --maxfail=10
 
       - name: Clean Up
         run: |

@@ -5,17 +5,14 @@ import tempfile
 import zipfile
 import shutil
 from copy import deepcopy
-from datetime import timedelta
 from functools import partial
 from hashlib import md5
 from itertools import islice
 import psycopg
 from aisdb.aisdb import decoder
-from dateutil.rrule import rrule, MONTHLY
 
 from aisdb import sqlpath
 from aisdb.database.dbconn import PostgresDBConn
-from aisdb.proc_util import getfiledate
 
 
 class FileChecksums:
@@ -173,21 +170,6 @@ def process_raw_files(
         return []
 
     if verbose:
-        print("checking file dates...")
-    filedates = [getfiledate(f, source) for f in raw_files]
-
-    months = [
-        month.strftime("%Y%m")
-        for month in rrule(
-            freq=MONTHLY,
-            dtstart=min(filedates) - timedelta(days=min(filedates).day - 1),
-            until=max(filedates),
-        )
-    ]
-    if verbose:
-        print("MONTHS = ", months)
-
-    if verbose:
         print("creating tables...")
 
     if isinstance(dbconn, PostgresDBConn):
@@ -207,7 +189,7 @@ def process_raw_files(
             dbconn.execute(create_dynamic_table_stmt)
             dbconn.execute(create_static_table_stmt)
             if not raw_insertion:
-                dbconn.drop_indexes(verbose=verbose, timescaledb=timescaledb)
+                dbconn.drop_indexes(verbose=verbose)
             dbconn.commit()
         else:
             with open(
@@ -217,13 +199,8 @@ def process_raw_files(
             with open(os.path.join(sqlpath, "psql_createtable_static.sql"), "r") as f:
                 create_static_table_stmt = f.read()
 
-            # The Rust writers insert into the global tables; per-month tables
-            # are kept for the aggregate/index helpers that operate monthly.
             dbconn.execute(create_dynamic_table_stmt.format("global"))
             dbconn.execute(create_static_table_stmt.format("global"))
-            for month in months:
-                dbconn.execute(create_dynamic_table_stmt.format(month))
-                dbconn.execute(create_static_table_stmt.format(month))
             dbconn.commit()
 
         completed_files = decoder(
@@ -272,14 +249,11 @@ def process_raw_files(
 
     if isinstance(dbconn, PostgresDBConn):
         if not raw_insertion and timescaledb:
-            dbconn.rebuild_indexes(verbose=verbose, timescaledb=timescaledb)
+            dbconn.rebuild_indexes(verbose=verbose)
             dbconn.execute("ANALYZE")
         dbconn.commit()
 
-    if timescaledb:
-        dbconn.aggregate_static_msgs(verbose=verbose)
-    else:
-        dbconn.aggregate_static_msgs(months, verbose)
+    dbconn.aggregate_static_msgs(verbose=verbose)
 
     if not raw_insertion and vacuum:
         print("finished parsing data\nvacuuming...")

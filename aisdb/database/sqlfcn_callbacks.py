@@ -2,10 +2,8 @@
     combined into lambdas for convenience
 '''
 
-from datetime import datetime, timedelta
 
 
-import numpy as np
 
 from aisdb.database.sql_query_strings import (
     has_mmsi,
@@ -15,11 +13,6 @@ from aisdb.database.sql_query_strings import (
     in_bbox as in_bbox_plain,
     in_bbox_geom
 )
-
-dt2monthstr = lambda start, end, **_: np.unique([
-    t.strftime('%Y%m')
-    for t in np.arange(start, end, timedelta(days=1)).astype(datetime)
-]).astype(object)
 
 in_time_mmsi = lambda **kwargs: f'''\
     {in_timerange(**kwargs)} AND {valid_mmsi(**kwargs)}'''

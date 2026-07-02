@@ -113,14 +113,9 @@ def TrackGen(rowgen: iter, decimate: False) -> dict:
         >>> from datetime import datetime
         >>> from aisdb import DBQuery, TrackGen, decode_msgs
         >>> from aisdb.database import sqlfcn_callbacks
-        >>> # create example database file
-        >>> dbpath = 'track_gen_test.db'
         >>> filepaths = ['aisdb/tests/testdata/test_data_20210701.csv',
         ...              'aisdb/tests/testdata/test_data_20211101.nm4']
 
-    '''
-    '''
-        >>> os.remove(dbpath)
     '''
     firstrow = True
     assert isinstance(rowgen, types.GeneratorType)

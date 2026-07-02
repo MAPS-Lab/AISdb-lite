@@ -82,13 +82,6 @@ def test_create_from_CSV_postgres_plain(tmpdir):
             "SELECT COUNT(*) AS n FROM ais_global_dynamic WHERE source = 'TESTING';"
         )
         assert cur.fetchone()["n"] > 0, "no rows ingested into ais_global_dynamic"
-        cur.execute(
-            """
-            DROP TABLE IF EXISTS ais_202107_dynamic CASCADE;
-            DROP TABLE IF EXISTS ais_202107_static CASCADE;
-            DROP TABLE IF EXISTS static_202107_aggregate CASCADE;
-            """
-        )
 
 
 def test_create_from_CSV_postgres_timescaledb_indexes(tmpdir):
@@ -213,9 +206,9 @@ def test_sql_query_strings_postgres_global(tmpdir):
             next(rowgen)
 
         # exercise the global-table maintenance helpers
-        aisdatabase.rebuild_indexes(timescaledb=True, verbose=False)
-        aisdatabase.deduplicate_dynamic_msgs(timescaledb=True, verbose=True)
-        aisdatabase.deduplicate_dynamic_msgs(timescaledb=True, verbose=False)
+        aisdatabase.rebuild_indexes(verbose=False)
+        aisdatabase.deduplicate_dynamic_msgs(verbose=True)
+        aisdatabase.deduplicate_dynamic_msgs(verbose=False)
 
 
 # def test_noaa_data_ingest_postgres_only(tmpdir):

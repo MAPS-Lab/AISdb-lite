@@ -1,13 +1,12 @@
 import importlib
+import importlib.metadata
 import logging
 import os
 
-import toml
-
-with open(
-    os.path.join(os.path.dirname(os.path.dirname(__file__)), "pyproject.toml"), "r"
-) as tomlfile:
-    __version__ = toml.load(tomlfile).get("project").get("version")
+try:
+    __version__ = importlib.metadata.version("aisdb")
+except importlib.metadata.PackageNotFoundError:  # running from a bare checkout
+    __version__ = "0.0.0+unknown"
 
 sqlpath = os.path.abspath(os.path.join(os.path.dirname(__file__), "aisdb_sql"))
 

@@ -2,7 +2,6 @@ import ipaddress
 import os
 import re
 import warnings
-from calendar import monthrange
 from collections import Counter
 from datetime import datetime, timezone
 from urllib.parse import quote
@@ -12,73 +11,72 @@ import numpy as np
 import psycopg
 
 from aisdb import sqlpath
-from aisdb.database.create_tables import (
-    sql_global_aggregate
-)
+from aisdb.database.create_tables import sql_global_aggregate
 
-with open(os.path.join(sqlpath, 'coarsetype.sql'), 'r') as f:
-    coarsetype_sql = f.read().split(';')
+with open(os.path.join(sqlpath, "coarsetype.sql"), "r") as f:
+    coarsetype_sql = f.read().split(";")
 
 
-class _DBConn():
-    ''' AISDB Database connection handler '''
+class _DBConn:
+    """AISDB Database connection handler"""
 
     def _create_table_coarsetype(self):
-        ''' create a table to describe integer vessel type as a human-readable
-            string.
-        '''
+        """create a table to describe integer vessel type as a human-readable
+        string.
+        """
         # cur = self.cursor()
         for stmt in coarsetype_sql:
-            if stmt == '\n':
+            if stmt == "\n":
                 continue
             # cur.execute(stmt)
             self.execute(stmt)
         self.commit()
         # cur.close()
 
+
 class PostgresDBConn(_DBConn, psycopg.Connection):
-    ''' This feature requires optional dependency psycopg for interfacing
-        Postgres databases.
+    """This feature requires optional dependency psycopg for interfacing
+    Postgres databases.
 
-        The following keyword arguments are accepted by Postgres:
-        | https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
+    The following keyword arguments are accepted by Postgres:
+    | https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
 
-        Alternatively, a connection string may be used.
-        Information on connection strings and postgres URI format can be found
-        here:
-        | https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
+    Alternatively, a connection string may be used.
+    Information on connection strings and postgres URI format can be found
+    here:
+    | https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 
-        Example:
+    Example:
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import os
-            from aisdb.database.dbconn import PostgresDBConn
+        import os
+        from aisdb.database.dbconn import PostgresDBConn
 
-            # keyword arguments
-            dbconn = PostgresDBConn(
-                hostaddr='127.0.0.1',
-                user='postgres',
-                port=5432,
-                password=os.environ.get('POSTGRES_PASSWORD'),
-                dbname='postgres',
-            )
+        # keyword arguments
+        dbconn = PostgresDBConn(
+            hostaddr='127.0.0.1',
+            user='postgres',
+            port=5432,
+            password=os.environ.get('POSTGRES_PASSWORD'),
+            dbname='postgres',
+        )
 
-            # Alternatively, connect using a connection string:
-            dbconn = PostgresDBConn('Postgresql://localhost:5433')
+        # Alternatively, connect using a connection string:
+        dbconn = PostgresDBConn('Postgresql://localhost:5433')
 
-    '''
+    """
 
     def _set_db_daterange(self):
         """
         Sets the date range of available AIS data in the database.
 
         This function checks the 'ais_global_dynamic' and 'ais_global_static' tables
-        (in that order) to determine the minimum and maximum UNIX timestamps stored 
-        in the 'time' column. It converts those timestamps to UTC date objects and 
+        (in that order) to determine the minimum and maximum UNIX timestamps stored
+        in the 'time' column. It converts those timestamps to UTC date objects and
         stores them in the `self.db_daterange` dictionary with keys 'start' and 'end'.
 
-        If neither table exists or contains valid timestamp data, 
+        If neither table exists or contains valid timestamp data,
         `self.db_daterange` is set to an empty dictionary.
 
         Tables are queried only if they exist (checked via information_schema),
@@ -96,13 +94,16 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
         for table in tables:
             try:
                 # Check if the table exists
-                cur.execute("""
+                cur.execute(
+                    """
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables
                         WHERE table_schema = 'public' AND table_name = %s
                     );
-                """, [table])
-                exists = cur.fetchone()['exists']
+                """,
+                    [table],
+                )
+                exists = cur.fetchone()["exists"]
 
                 if not exists:
                     continue
@@ -111,11 +112,15 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
                 cur.execute(f"SELECT MIN(time), MAX(time) FROM {table}")
                 result = cur.fetchone()
 
-                if result and result['min'] is not None and result['max'] is not None:
-                    min_ts, max_ts = result['min'], result['max']
+                if result and result["min"] is not None and result["max"] is not None:
+                    min_ts, max_ts = result["min"], result["max"]
                     self.db_daterange = {
-                        'start': datetime.fromtimestamp(int(min_ts), tz=timezone.utc).date(),
-                        'end': datetime.fromtimestamp(int(max_ts), tz=timezone.utc).date()
+                        "start": datetime.fromtimestamp(
+                            int(min_ts), tz=timezone.utc
+                        ).date(),
+                        "end": datetime.fromtimestamp(
+                            int(max_ts), tz=timezone.utc
+                        ).date(),
                     }
                     print(f"Date range set using table: {table}")
                     return
@@ -129,7 +134,6 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
         print("No valid global tables with timestamp found.")
         self.db_daterange = {}
 
-
     def __enter__(self):
         self.conn.__enter__()
         return self
@@ -137,7 +141,7 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
     def __exit__(self, exc_class, exc, tb):
         self.conn.__exit__(exc_class, exc, tb)
         if exc_class or exc or tb:
-            print('rolling back...')
+            print("rolling back...")
             raise exc
 
     def __init__(self, libpq_connstring=None, **kwargs):
@@ -145,51 +149,51 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
         # store the connection string as an attribute
         # this info will be passed to rust when possible
         if libpq_connstring is not None:
-            self.conn = psycopg.connect(libpq_connstring,
-                                        row_factory=psycopg.rows.dict_row)
+            self.conn = psycopg.connect(
+                libpq_connstring, row_factory=psycopg.rows.dict_row
+            )
             self.connection_string = libpq_connstring
         else:
-            self.conn = psycopg.connect(row_factory=psycopg.rows.dict_row,
-                                        **kwargs)
-            self.connection_string = 'postgresql://'
+            self.conn = psycopg.connect(row_factory=psycopg.rows.dict_row, **kwargs)
+            self.connection_string = "postgresql://"
 
-            if 'user' in kwargs.keys():
-                self.connection_string += quote(kwargs.pop('user'), safe='')
+            if "user" in kwargs.keys():
+                self.connection_string += quote(kwargs.pop("user"), safe="")
             else:
-                self.connection_string += 'postgres'
+                self.connection_string += "postgres"
 
-            if 'password' in kwargs.keys():
-                self.connection_string += ':'
-                self.connection_string += quote(kwargs.pop('password'), safe='')
-            self.connection_string += '@'
+            if "password" in kwargs.keys():
+                self.connection_string += ":"
+                self.connection_string += quote(kwargs.pop("password"), safe="")
+            self.connection_string += "@"
 
-            if 'hostaddr' in kwargs.keys():
-                ip = ipaddress.ip_address(kwargs.pop('hostaddr'))
+            if "hostaddr" in kwargs.keys():
+                ip = ipaddress.ip_address(kwargs.pop("hostaddr"))
                 if ip.version == 4:
                     self.connection_string += str(ip)
                 elif ip.version == 6:
-                    self.connection_string += '['
+                    self.connection_string += "["
                     self.connection_string += str(ip)
-                    self.connection_string += ']'
+                    self.connection_string += "]"
                 else:
                     raise ValueError(str(ip))
             else:
-                self.connection_string += 'localhost'
-            self.connection_string += ':'
+                self.connection_string += "localhost"
+            self.connection_string += ":"
 
-            if 'port' in kwargs.keys():
-                self.connection_string += str(kwargs.pop('port'))
+            if "port" in kwargs.keys():
+                self.connection_string += str(kwargs.pop("port"))
             else:
-                self.connection_string += '5432'
+                self.connection_string += "5432"
 
-            if 'dbname' in kwargs.keys():
-                self.connection_string += '/'
-                self.connection_string += kwargs.pop('dbname')
+            if "dbname" in kwargs.keys():
+                self.connection_string += "/"
+                self.connection_string += kwargs.pop("dbname")
 
             if len(kwargs) > 0:
-                self.connection_string += '?'
+                self.connection_string += "?"
                 for key, val in kwargs.items():
-                    self.connection_string += f'{key}={val}&'
+                    self.connection_string += f"{key}={val}&"
                 self.connection_string = self.connection_string[:-1]
 
         self.cursor = self.conn.cursor
@@ -203,8 +207,10 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
 
         cur = self.cursor()
 
-        coarsetype_qry = ("select table_name from information_schema.tables "
-                          "where table_name = 'coarsetype_ref'")
+        coarsetype_qry = (
+            "select table_name from information_schema.tables "
+            "where table_name = 'coarsetype_ref'"
+        )
 
         cur.execute(coarsetype_qry)
         coarsetype_exists = cur.fetchone()
@@ -215,188 +221,87 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
         self._set_db_daterange()
 
     def execute(self, sql, args=[]):
-        sql = re.sub(r'\$[0-9][0-9]*', r'%s', sql)
+        sql = re.sub(r"\$[0-9][0-9]*", r"%s", sql)
         with self.cursor() as cur:
             cur.execute(sql, args)
 
-    def drop_indexes(self, month=None, verbose=True, timescaledb=False):
+    def drop_indexes(self, verbose=True):
         dbconn = self.conn
-        if timescaledb or month is None:
-            if verbose:
-                print('dropping indexes of ais_global_dynamic...')
-            dbconn.execute('DROP INDEX IF EXISTS ais_global_dynamic_mmsi_time_idx;')
-            dbconn.execute('DROP INDEX IF EXISTS ais_global_dynamic_time_idx;')
-            for idx_name in ("mmsi", "time", "longitude", "latitude"):
-                dbconn.execute(f"DROP INDEX IF EXISTS idx_ais_global_dynamic_{idx_name};")
-            return
-
         if verbose:
-            print(f'dropping indexes of ais_{month}_dynamic...')
-        dbconn.execute(f"DROP INDEX IF EXISTS idx_ais_{month}_dynamic_pkkey;")
-        dbconn.execute(f"DROP INDEX IF EXISTS idx_{month}_dynamic_longitude;")
-        dbconn.execute(f"DROP INDEX IF EXISTS idx_{month}_dynamic_latitude;")
-        dbconn.execute(f"DROP INDEX IF EXISTS idx_{month}_dynamic_time;")
-        dbconn.execute(f"DROP INDEX IF EXISTS idx_{month}_dynamic_mmsi;")
+            print("dropping indexes of ais_global_dynamic...")
+        dbconn.execute("DROP INDEX IF EXISTS ais_global_dynamic_mmsi_time_idx;")
+        dbconn.execute("DROP INDEX IF EXISTS ais_global_dynamic_time_idx;")
+        for idx_name in ("mmsi", "time", "longitude", "latitude"):
+            dbconn.execute(f"DROP INDEX IF EXISTS idx_ais_global_dynamic_{idx_name};")
 
-    def rebuild_indexes(self, month=None, verbose=True, timescaledb=False):
+    def rebuild_indexes(self, verbose=True):
         dbconn = self.conn
-        if timescaledb or month is None:
-            if verbose:
-                print('indexing ais_global_dynamic...')
-            dbconn.execute(
-                "CREATE INDEX IF NOT EXISTS ais_global_dynamic_mmsi_time_idx"
-                " ON ais_global_dynamic (mmsi, time);"
-            )
-            dbconn.execute(
-                "CREATE INDEX IF NOT EXISTS ais_global_dynamic_time_idx"
-                " ON ais_global_dynamic (time);"
-            )
-            for idx_name in ('mmsi', 'time', 'longitude', 'latitude'):
-                dbconn.execute(
-                    f"CREATE INDEX IF NOT EXISTS idx_ais_global_dynamic_{idx_name} ON ais_global_dynamic ({idx_name});")
-            dbconn.commit()
-            return
-
         if verbose:
-            print(f'indexing ais_{month}_dynamic...')
+            print("indexing ais_global_dynamic...")
         dbconn.execute(
-            f"CREATE UNIQUE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_pkkey "
-            f"ON ais_{month}_dynamic (mmsi, time, longitude, latitude);"
+            "CREATE INDEX IF NOT EXISTS ais_global_dynamic_mmsi_time_idx"
+            " ON ais_global_dynamic (mmsi, time);"
         )
+        for idx_name in ("mmsi", "longitude", "latitude"):
+            dbconn.execute(
+                f"CREATE INDEX IF NOT EXISTS idx_ais_global_dynamic_{idx_name} ON ais_global_dynamic ({idx_name});"
+            )
+        # the time index is BRIN, matching timescale_createtable_dynamic.sql
+        # (see docs/BRIN_INDEX_MIGRATION.md); recreating it as btree here
+        # would silently clobber the migration on the next drop/rebuild cycle
         dbconn.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{month}_dynamic_longitude ON ais_{month}_dynamic (longitude);"
+            "CREATE INDEX IF NOT EXISTS idx_ais_global_dynamic_time"
+            " ON ais_global_dynamic USING BRIN (time);"
         )
-        dbconn.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{month}_dynamic_latitude ON ais_{month}_dynamic (latitude);"
-        )
-        dbconn.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{month}_dynamic_time ON ais_{month}_dynamic (time);"
-        )
-        dbconn.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{month}_dynamic_mmsi ON ais_{month}_dynamic (mmsi);"
-        )
-
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_mmsi '
-        #     f'ON ais_{month}_dynamic (mmsi)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing mmsi: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_time '
-        #     f'ON ais_{month}_dynamic (time)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing time: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_lon '
-        #     f'ON ais_{month}_dynamic (longitude)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing longitude: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_lat '
-        #     f'ON ais_{month}_dynamic (latitude)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing latitude: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_dynamic_cluster '
-        #     f'ON ais_{month}_dynamic (mmsi, time, longitude, latitude, source)'
-        # )
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing combined index: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_static_mmsi '
-        #     f'ON ais_{month}_static (mmsi)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing static mmsi: {month}')
-        # dbconn.execute(
-        #     f'CREATE INDEX IF NOT EXISTS idx_ais_{month}_static_time '
-        #     f'ON ais_{month}_static (time)')
-        # dbconn.commit()
-        # if verbose:
-        #     print(f'done indexing static time: {month}')
-        # dbconn.execute(
-        #     f'CLUSTER {"VERBOSE" if verbose else ""} ais_{month}_dynamic\n'
-        #     f'USING idx_ais_{month}_dynamic_cluster')
         dbconn.commit()
-        # if verbose:
-        #     print(f'done clustering: {month}')
 
-    def deduplicate_dynamic_msgs(self, month=None, verbose=True, timescaledb=False):
+    def deduplicate_dynamic_msgs(self, verbose=True):
         dbconn = self.conn
-        if timescaledb or month is None:
-            dbconn.execute('''
-                DELETE FROM ais_global_dynamic WHERE ctid IN (
-                    SELECT ctid FROM (
-                        SELECT *, row_number() OVER (PARTITION BY mmsi, time, latitude, longitude ORDER BY ctid)
-                        FROM ais_global_dynamic
-                    ) AS duplicates
-                    WHERE row_number > 1
-                )
-                ''')
-            dbconn.commit()
-            if verbose:
-                print('done deduplicating ais_global_dynamic')
-            return
-
-        dbconn.execute(f'''
-            DELETE FROM ais_{month}_dynamic WHERE ctid IN (
+        dbconn.execute("""
+            DELETE FROM ais_global_dynamic WHERE ctid IN (
                 SELECT ctid FROM (
-                    SELECT *, row_number() OVER (PARTITION BY mmsi, time, longitude, latitude ORDER BY ctid)
-                    FROM ais_{month}_dynamic
-                ) AS duplicates_{month}
+                    SELECT *, row_number() OVER (PARTITION BY mmsi, time, latitude, longitude ORDER BY ctid)
+                    FROM ais_global_dynamic
+                ) AS duplicates
                 WHERE row_number > 1
             )
-            ''')
+            """)
         dbconn.commit()
         if verbose:
-            print(f'done deduplicating ais_{month}_dynamic')
+            print("done deduplicating ais_global_dynamic")
 
-    def aggregate_static_msgs(self, months=None, verbose: bool = True, **_):
-        ''' collect an aggregate of static vessel reports for each unique MMSI
-            identifier. The most frequently repeated values for each MMSI will
-            be kept when multiple different reports appear for the same MMSI
+    def aggregate_static_msgs(self, verbose: bool = True):
+        """collect an aggregate of static vessel reports for each unique MMSI
+        identifier. The most frequently repeated values for each MMSI will
+        be kept when multiple different reports appear for the same MMSI
 
-            this function should be called every time data is added to the database
+        this function should be called every time data is added to the database
 
-            args:
-                months (list|None)
-                    unused for global aggregate (kept for compatibility)
-                verbose (bool)
-                    logs messages to stdout
-        '''
-
-        if isinstance(months, bool) and verbose is True:
-            verbose = months
-            months = None
+        args:
+            verbose (bool)
+                logs messages to stdout
+        """
 
         cur = self.cursor()
 
         if verbose:
-            print('aggregating static reports into static_global_aggregate...')
-        cur.execute(f'SELECT DISTINCT mmsi FROM ais_global_static')
+            print("aggregating static reports into static_global_aggregate...")
+        cur.execute(f"SELECT DISTINCT mmsi FROM ais_global_static")
         mmsi_res = cur.fetchall()
         if mmsi_res == []:
             mmsis = np.array([], dtype=int)
         else:
-            mmsis = np.array(sorted([r['mmsi'] for r in mmsi_res]),
-                                dtype=int).flatten()
+            mmsis = np.array(sorted([r["mmsi"] for r in mmsi_res]), dtype=int).flatten()
 
-        cur.execute(
-            psycopg.sql.SQL(
-                f'DROP TABLE IF EXISTS static_global_aggregate'))
+        cur.execute(psycopg.sql.SQL(f"DROP TABLE IF EXISTS static_global_aggregate"))
 
-        sql_select = psycopg.sql.SQL(f'''
+        sql_select = psycopg.sql.SQL(f"""
             SELECT
             s.mmsi, s.imo, TRIM(vessel_name) as vessel_name, s.ship_type, s.call_sign,
             s.dim_bow, s.dim_stern, s.dim_port, s.dim_star, s.draught, s.destination,
             s.eta_month, s.eta_day, s.eta_hour, s.eta_minute
             FROM ais_global_static AS s WHERE s.mmsi = %s
-        ''')
+        """)
 
         agg_rows = []
         for mmsi in mmsis:
@@ -406,10 +311,7 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
             assert len(cols) > 0
 
             filtercols = np.array(
-                [
-                    np.array(list(filter(None, col)), dtype=object)
-                    for col in cols
-                ],
+                [np.array(list(filter(None, col)), dtype=object) for col in cols],
                 dtype=object,
             )
 
@@ -418,34 +320,35 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
                 dtype=object,
             )
 
-            aggregated = [
-                Counter(col).most_common(1)[0][0] for col in paddedcols
-            ]
+            aggregated = [Counter(col).most_common(1)[0][0] for col in paddedcols]
 
             agg_rows.append(aggregated)
 
         cur.execute(sql_global_aggregate)
 
         if len(agg_rows) == 0:
-            warnings.warn('no rows to aggregate! table: static_global_aggregate')
+            warnings.warn("no rows to aggregate! table: static_global_aggregate")
             return
 
         skip_nommsi = np.array(agg_rows, dtype=object)
         assert len(skip_nommsi.shape) == 2
         skip_nommsi = skip_nommsi[skip_nommsi[:, 0] != None]
         if len(skip_nommsi) == 0:
-            warnings.warn('no valid MMSIs to aggregate! table: static_global_aggregate')
+            warnings.warn("no valid MMSIs to aggregate! table: static_global_aggregate")
             return
-        insert_vals = ','.join(['%s' for _ in range(skip_nommsi.shape[1])])
+        insert_vals = ",".join(["%s" for _ in range(skip_nommsi.shape[1])])
         insert_stmt = psycopg.sql.SQL(
-            f'INSERT INTO static_global_aggregate '
-            f'VALUES ({insert_vals})')
+            f"INSERT INTO static_global_aggregate VALUES ({insert_vals})"
+        )
         cur.executemany(insert_stmt, map(tuple, skip_nommsi))
 
         self.commit()
 
+
 DBConn = PostgresDBConn
 
+
 class ConnectionType(Enum):
-    ''' database connection types enum. used for static type hints '''
+    """database connection types enum. used for static type hints"""
+
     POSTGRES = PostgresDBConn
