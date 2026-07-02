@@ -47,6 +47,7 @@ class Gebco():
     def fetch_bathymetry_grid(self):  # pragma: no cover
         """ download geotiff zip archive and extract it """
 
+        os.makedirs(self.data_dir, exist_ok=True)
         if any(f.endswith('.tif') and 'gebco_2022' in f for f in os.listdir(self.data_dir)):
             return  # bathymetry data already present
 
@@ -78,9 +79,13 @@ class Gebco():
                 with py7zr.SevenZipFile(zipf, mode='r') as zip_ref:
                     zip_ref.extractall(path=self.data_dir)
 
-        except (Exception, KeyboardInterrupt) as err:
-            os.remove(os.path.join(self.data_dir, "raster-bathy.7z"))
-            raise err
+        except (Exception, KeyboardInterrupt):
+            # Best-effort cleanup; never let it mask the original error
+            try:
+                os.remove(zipf)
+            except OSError:
+                pass
+            raise
         
         print(f"Removing {zipf} to save space...")
         if os.path.exists(zipf):

@@ -3,13 +3,21 @@ from datetime import datetime, timedelta
 
 from shapely.geometry import Polygon
 
-from aisdb import (DBQuery, Domain, PostgresDBConn, sqlfcn, sqlfcn_callbacks, )
+from aisdb import (
+    DBQuery,
+    Domain,
+    PostgresDBConn,
+    sqlfcn,
+    sqlfcn_callbacks,
+)
 from aisdb.database.decoder import decode_msgs
 from aisdb.tests.create_testing_data import sample_gulfstlawrence_bbox
 from aisdb.track_gen import TrackGen
 
-conn_information = (f"postgresql://{os.environ['pguser']}:{os.environ['pgpass']}@"
-                    f"{os.environ['pghost']}:5432/{os.environ['pguser']}")
+conn_information = (
+    f"postgresql://{os.environ['pguser']}:{os.environ['pgpass']}@"
+    f"{os.environ['pghost']}:5432/{os.environ['pguser']}"
+)
 
 
 def test_postgres():
@@ -22,15 +30,29 @@ def test_postgres():
 
 
 def test_create_from_CSV_postgres(tmpdir):
-    testingdata_csv = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20210701.csv")
+    testingdata_csv = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20210701.csv"
+    )
     with PostgresDBConn(conn_information) as dbconn:
-        decode_msgs(dbconn=dbconn, filepaths=[testingdata_csv], source="TESTING", vacuum=False, )
+        decode_msgs(
+            dbconn=dbconn,
+            filepaths=[testingdata_csv],
+            source="TESTING",
+            vacuum=False,
+        )
         cur = dbconn.cursor()
         cur.execute(
             "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'public' ORDER BY table_name;")
+            "WHERE table_schema = 'public' ORDER BY table_name;"
+        )
         tables = [row["table_name"] for row in cur.fetchall()]
         assert "ais_global_dynamic" in tables
+        # Read back ingested rows: table existence alone cannot catch a
+        # silently failing insert path.
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM ais_global_dynamic WHERE source = 'TESTING';"
+        )
+        assert cur.fetchone()["n"] > 0, "no rows ingested into ais_global_dynamic"
         cur.execute(
             """
             DROP TABLE IF EXISTS ais_202107_dynamic CASCADE;
@@ -40,34 +62,67 @@ def test_create_from_CSV_postgres(tmpdir):
         )
 
 
-@pytest.mark.skipif(sys.platform.startswith("win"), reason="TimescaleDB is not supported on Windows")
+@pytest.mark.skipif(
+    sys.platform.startswith("win"), reason="TimescaleDB is not supported on Windows"
+)
 def test_create_from_CSV_postgres_timescaledb(tmpdir):
-    testingdata_csv = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20210701.csv")
+    testingdata_csv = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20210701.csv"
+    )
     with PostgresDBConn(conn_information) as dbconn:
-        decode_msgs(dbconn=dbconn, filepaths=[testingdata_csv], source="TESTING", vacuum=False,
-                    skip_checksum=True, raw_insertion=True, timescaledb=True)
+        decode_msgs(
+            dbconn=dbconn,
+            filepaths=[testingdata_csv],
+            source="TESTING",
+            vacuum=False,
+            skip_checksum=True,
+            raw_insertion=True,
+            timescaledb=True,
+        )
         cur = dbconn.cursor()
         cur.execute(
             "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = 'public' ORDER BY table_name;")
+            "WHERE table_schema = 'public' ORDER BY table_name;"
+        )
         tables = [row["table_name"] for row in cur.fetchall()]
-        assert "ais_202107_dynamic" in tables
+        # TimescaleDB ingestion targets the global hypertables (no per-month tables)
+        assert "ais_global_dynamic" in tables
+        assert "ais_global_static" in tables
 
-        # Fetch and print indexes for the table
+        # Read back ingested rows through the hypertable
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM ais_global_dynamic WHERE source = 'TESTING';"
+        )
+        assert cur.fetchone()["n"] > 0, "no rows ingested into ais_global_dynamic"
+
+        # The BRIN time index and GiST geom index must exist on the hypertable
         cur.execute("""
-            SELECT indexname, indexdef 
-            FROM pg_indexes 
+            SELECT indexname, indexdef
+            FROM pg_indexes
             WHERE tablename = 'ais_global_dynamic';
         """)
-        indexes = cur.fetchall()
-        print(indexes)
+        indexes = {row["indexname"]: row["indexdef"] for row in cur.fetchall()}
+        assert any("brin" in indexdef.lower() for indexdef in indexes.values()), (
+            f"BRIN index missing on ais_global_dynamic: {sorted(indexes)}"
+        )
+        assert any("gist" in indexdef.lower() for indexdef in indexes.values()), (
+            f"GiST geom index missing on ais_global_dynamic: {sorted(indexes)}"
+        )
 
 
 def test_decode_1day_postgres(tmpdir):
-    testingdata_nm4 = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20211101.nm4")
-    testingdata_csv = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20210701.csv")
-    testingdata_gz = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.gz")
-    testingdata_zip = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.zip")
+    testingdata_nm4 = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20211101.nm4"
+    )
+    testingdata_csv = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20210701.csv"
+    )
+    testingdata_gz = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.gz"
+    )
+    testingdata_zip = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.zip"
+    )
     filepaths = [testingdata_csv, testingdata_nm4, testingdata_gz, testingdata_zip]
 
     with PostgresDBConn(conn_information) as dbconn:
@@ -75,34 +130,68 @@ def test_decode_1day_postgres(tmpdir):
         # dbconn.commit()
 
         dt = datetime.now()
-        decode_msgs(filepaths=filepaths, dbconn=dbconn, source="TESTING", vacuum=True, verbose=True)
+        decode_msgs(
+            filepaths=filepaths,
+            dbconn=dbconn,
+            source="TESTING",
+            vacuum=True,
+            verbose=True,
+        )
         delta = datetime.now() - dt
         print(f"postgres total parse and insert time: {delta.total_seconds():.2f}s")
 
 
 def test_sql_query_strings_postgres(tmpdir):
-    testingdata_nm4 = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20211101.nm4")
-    testingdata_csv = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20210701.csv")
-    testingdata_gz = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.gz")
-    testingdata_zip = os.path.join(os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.zip")
+    testingdata_nm4 = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20211101.nm4"
+    )
+    testingdata_csv = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20210701.csv"
+    )
+    testingdata_gz = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.gz"
+    )
+    testingdata_zip = os.path.join(
+        os.path.dirname(__file__), "testdata", "test_data_20211101.nm4.zip"
+    )
     filepaths = [testingdata_csv, testingdata_nm4, testingdata_gz, testingdata_zip]
-  
+
     months = ["202107", "202111"]
     start = datetime(int(months[0][0:4]), int(months[0][4:6]), 1)
     end = start + timedelta(weeks=4)
     z1 = Polygon(zip(*sample_gulfstlawrence_bbox()))
     domain = Domain("gulf domain", zones=[{"name": "z1", "geometry": z1}])
     with PostgresDBConn(conn_information) as aisdatabase:
-        decode_msgs(filepaths=filepaths, dbconn=aisdatabase, source="TESTING", vacuum=True, verbose=True,
-                    skip_checksum=True)
-        for callback in [sqlfcn_callbacks.in_bbox, sqlfcn_callbacks.in_bbox_time,
-            sqlfcn_callbacks.in_bbox_time_validmmsi, sqlfcn_callbacks.in_time_bbox_inmmsi,
-            sqlfcn_callbacks.in_timerange, sqlfcn_callbacks.in_timerange_hasmmsi,
-            sqlfcn_callbacks.in_timerange_validmmsi, ]:
-            rowgen = DBQuery(dbconn=aisdatabase, start=start, end=end, **domain.boundary, callback=callback,
-                mmsi=316000000, mmsis=[316000000, 316000001], ).gen_qry(fcn=sqlfcn.crawl_dynamic_static)
+        decode_msgs(
+            filepaths=filepaths,
+            dbconn=aisdatabase,
+            source="TESTING",
+            vacuum=True,
+            verbose=True,
+            skip_checksum=True,
+        )
+        for callback in [
+            sqlfcn_callbacks.in_bbox,
+            sqlfcn_callbacks.in_bbox_time,
+            sqlfcn_callbacks.in_bbox_time_validmmsi,
+            sqlfcn_callbacks.in_time_bbox_inmmsi,
+            sqlfcn_callbacks.in_timerange,
+            sqlfcn_callbacks.in_timerange_hasmmsi,
+            sqlfcn_callbacks.in_timerange_validmmsi,
+        ]:
+            rowgen = DBQuery(
+                dbconn=aisdatabase,
+                start=start,
+                end=end,
+                **domain.boundary,
+                callback=callback,
+                mmsi=316000000,
+                mmsis=[316000000, 316000001],
+            ).gen_qry(fcn=sqlfcn.crawl_dynamic_static)
             row = next(rowgen, None)
-            assert row is not None, "Expected at least one row from query; database may be empty or ingest failed."
+            assert row is not None, (
+                "Expected at least one row from query; database may be empty or ingest failed."
+            )
         aisdatabase.rebuild_indexes(months[0], verbose=False)
         aisdatabase.deduplicate_dynamic_msgs(months[0], verbose=True)
         aisdatabase.deduplicate_dynamic_msgs(months[0], verbose=False)

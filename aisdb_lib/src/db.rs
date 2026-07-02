@@ -7,15 +7,6 @@ use include_dir::{include_dir, Dir};
 #[cfg(feature = "postgres")]
 pub use postgres::{Client as PGClient, NoTls, Transaction as PGTransaction};
 
-#[cfg(feature = "postgres")]
-use std::sync::Mutex;
-
-#[cfg(feature = "postgres")]
-lazy_static::lazy_static! {
-    /// Cache do schema: armazena se a tabela tem coluna 'rot'
-    static ref SCHEMA_CACHE: Mutex<std::collections::HashMap<String, bool>> = Mutex::new(std::collections::HashMap::new());
-}
-
 #[cfg(feature = "sqlite")]
 pub use rusqlite::{
     params, Connection as SqliteConnection, OpenFlags, Result as SqliteResult,
@@ -172,7 +163,7 @@ pub fn sqlite_insert_static(
 pub fn postgres_insert_static(
     tx: &mut PGTransaction,
     msgs: Vec<VesselData>,
-    mstr: &str,
+    _mstr: &str,
     source: &str,
 ) -> Result<(), postgres::Error> {
     // let sql = sql_from_file("new_insert_static.sql").replace("{}", mstr);
@@ -186,8 +177,8 @@ pub fn postgres_insert_static(
         tx.execute(
             &stmt,
             &[
-                &(p.mmsi as i32),
-                &(e as i32),
+                &(p.mmsi as i64),
+                &(e as i64),
                 &p.name.unwrap_or_default(),
                 &(p.ship_type as i32),
                 &p.call_sign.unwrap_or_default(),
@@ -260,48 +251,34 @@ pub fn sqlite_insert_dynamic(
 }
 
 #[cfg(feature = "postgres")]
-/// Detecta conjunto de colunas disponíveis na tabela
+/// Detect which column set the ais_global_dynamic table exposes.
+///
+/// Queried per transaction (one cheap information_schema lookup per file
+/// batch); results are deliberately NOT cached process-wide, since one
+/// process may hold connections to databases with different schemas.
 fn detect_table_schema(tx: &mut PGTransaction) -> Result<String, postgres::Error> {
-    let cache_key = "ais_global_dynamic.schema_version".to_string();
-    
-    // Verifica cache primeiro
-    {
-        let cache = SCHEMA_CACHE.lock().unwrap();
-        if let Some(&has_col) = cache.get(&cache_key) {
-            return Ok(if has_col { "full" } else { "minimal" }.to_string());
-        }
-    }
-    
-    // Query para verificar colunas específicas
     let query = "
-        SELECT 
+        SELECT
             EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'rot') as has_rot,
             EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'maneuver') as has_maneuver,
             EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'utc_second') as has_utc,
             EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ais_global_dynamic' AND column_name = 'source') as has_source
     ";
-    
+
     let row = tx.query_one(query, &[])?;
     let has_rot: bool = row.get(0);
     let has_maneuver: bool = row.get(1);
     let has_utc: bool = row.get(2);
     let has_source: bool = row.get(3);
-    
-    // Determina versão do schema
+
     let schema_version = if has_rot && has_maneuver && has_utc && has_source {
-        "full"        // Schema completo com todas colunas
+        "full" // complete schema with every column
     } else if !has_rot && has_maneuver && has_utc && has_source {
-        "norot"       // Schema sem rot
+        "norot" // schema without the rot column
     } else {
-        "minimal"     // Schema básico (11 colunas)
+        "minimal" // basic 7-column schema
     };
-    
-    // Atualiza cache
-    {
-        let mut cache = SCHEMA_CACHE.lock().unwrap();
-        cache.insert(cache_key, schema_version == "full");
-    }
-    
+
     Ok(schema_version.to_string())
 }
 
@@ -310,13 +287,12 @@ fn detect_table_schema(tx: &mut PGTransaction) -> Result<String, postgres::Error
 pub fn postgres_insert_dynamic(
     tx: &mut PGTransaction,
     msgs: Vec<VesselData>,
-    mstr: &str,
+    _mstr: &str,
     source: &str,
 ) -> Result<(), postgres::Error> {
-    // Detecta schema da tabela
+    // Detect the table schema, then pick the matching INSERT statement
     let schema_version = detect_table_schema(tx)?;
-    
-    // Escolhe SQL baseado no schema
+
     let sql = match schema_version.as_str() {
         "full" => sql_from_file("new_insert_dynamic_clusteredidx.sql"),
         "norot" => sql_from_file("new_insert_dynamic_norot.sql"),
@@ -327,15 +303,16 @@ pub fn postgres_insert_dynamic(
 
     for msg in msgs {
         let (p, e) = msg.dynamicdata();
-        
+
         match schema_version.as_str() {
             "full" => {
-                // INSERT completo com todas colunas
+                // full INSERT with every column
+                // mmsi/time are BIGINT (i64); coordinate columns are REAL (f32)
                 let _ = tx.execute(
                     &stmt,
                     &[
-                        &(p.mmsi as i32),
-                        &(e as i32),
+                        &(p.mmsi as i64),
+                        &(e as i64),
                         &(p.longitude.unwrap_or_default() as f32),
                         &(p.latitude.unwrap_or_default() as f32),
                         &(p.rot.unwrap_or_default() as f32),
@@ -347,14 +324,14 @@ pub fn postgres_insert_dynamic(
                         &source,
                     ],
                 )?;
-            },
+            }
             "norot" => {
-                // INSERT sem rot
+                // INSERT without the rot column
                 let _ = tx.execute(
                     &stmt,
                     &[
-                        &(p.mmsi as i32),
-                        &(e as i32),
+                        &(p.mmsi as i64),
+                        &(e as i64),
                         &(p.longitude.unwrap_or_default() as f32),
                         &(p.latitude.unwrap_or_default() as f32),
                         &(p.sog_knots.unwrap_or_default() as f32),
@@ -365,20 +342,19 @@ pub fn postgres_insert_dynamic(
                         &source,
                     ],
                 )?;
-            },
+            }
             _ => {
-                // INSERT mínimo (apenas colunas básicas)
-                // Usa f64 para colunas NUMERIC do Postgres
+                // minimal INSERT (basic columns only)
                 let _ = tx.execute(
                     &stmt,
                     &[
-                        &(p.mmsi as i32),
+                        &(p.mmsi as i64),
                         &(e as i64),
-                        &(p.longitude.unwrap_or_default() as f64),
-                        &(p.latitude.unwrap_or_default() as f64),
-                        &(p.sog_knots.unwrap_or_default() as f64),
-                        &(p.cog.unwrap_or_default() as f64),
-                        &(p.heading_true.unwrap_or_default() as i32),
+                        &(p.longitude.unwrap_or_default() as f32),
+                        &(p.latitude.unwrap_or_default() as f32),
+                        &(p.sog_knots.unwrap_or_default() as f32),
+                        &(p.cog.unwrap_or_default() as f32),
+                        &(p.heading_true.unwrap_or_default() as f32),
                     ],
                 )?;
             }

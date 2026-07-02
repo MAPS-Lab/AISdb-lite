@@ -4,7 +4,7 @@ from aisdb.aisdb import receiver as _receiver
 
 
 def start_receiver(postgres_connection_string=None,
-                   connect_addr="aisdb.meridian.cs.dal.ca:9920",
+                   connect_addr="aisviz.cs.dal.ca:9920",
                    tcp_listen_addr=None,
                    udp_listen_addr=None,
                    multicast_addr=None,

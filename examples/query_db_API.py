@@ -9,7 +9,7 @@ import orjson
 import websockets.client
 
 # Query the MERIDIAN web API, or reconfigure the URL with an environment variable
-db_hostname = 'wss://aisdb.meridian.cs.dal.ca/ws'
+db_hostname = 'wss://aisviz.cs.dal.ca/ws'
 db_hostname = os.environ.get('AISDBHOST', db_hostname)
 
 

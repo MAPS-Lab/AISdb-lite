@@ -37,7 +37,7 @@ class FileChecksums:
         assert isinstance(dbconn, (PostgresDBConn))
         self.dbconn = dbconn
         self.checksums_table()
-        
+
         self.tmp_dir = tempfile.mkdtemp()
 
         if not os.path.isdir(self.tmp_dir):
@@ -76,7 +76,8 @@ class FileChecksums:
         if isinstance(self.dbconn, PostgresDBConn):
             self.dbconn.execute(
                 "INSERT INTO hashmap VALUES ($1,$2) ON CONFLICT DO NOTHING",
-                [checksum, pickle.dumps(None)])
+                [checksum, pickle.dumps(None)],
+            )
             self.dbconn.commit()
 
     def checksum_exists(self, checksum):
@@ -146,7 +147,24 @@ def fast_unzip(zip_filenames, dirname):
     for file in zip_filenames:
         fcn(file)
 
-def process_raw_files(dbconn, dbindex, raw_files, source, timescaledb, raw_insertion, vacuum, verbose, workers, type_preference, not_zipped, unzipped, not_zipped_checksums, unzipped_checksums, skip_checksum):
+
+def process_raw_files(
+    dbconn,
+    dbindex,
+    raw_files,
+    source,
+    timescaledb,
+    raw_insertion,
+    vacuum,
+    verbose,
+    workers,
+    type_preference,
+    not_zipped,
+    unzipped,
+    not_zipped_checksums,
+    unzipped_checksums,
+    skip_checksum,
+):
     if not raw_files:
         if verbose:
             print("All files returned an existing checksum. Cleaning temporary data...")
@@ -159,7 +177,8 @@ def process_raw_files(dbconn, dbindex, raw_files, source, timescaledb, raw_inser
     filedates = [getfiledate(f, source) for f in raw_files]
 
     months = [
-        month.strftime("%Y%m") for month in rrule(
+        month.strftime("%Y%m")
+        for month in rrule(
             freq=MONTHLY,
             dtstart=min(filedates) - timedelta(days=min(filedates).day - 1),
             until=max(filedates),
@@ -172,37 +191,17 @@ def process_raw_files(dbconn, dbindex, raw_files, source, timescaledb, raw_inser
         print("creating tables...")
 
     if isinstance(dbconn, PostgresDBConn):
-        # Ensure global tables exist
-        global_dynamic_table = """
-        CREATE TABLE IF NOT EXISTS ais_global_dynamic (
-            id SERIAL PRIMARY KEY,
-            mmsi BIGINT NOT NULL,
-            timestamp TIMESTAMPTZ NOT NULL,
-            data JSONB
-        );
-        """
-
-        global_static_table = """
-        CREATE TABLE IF NOT EXISTS ais_global_static (
-            id SERIAL PRIMARY KEY,
-            mmsi BIGINT NOT NULL,
-            timestamp TIMESTAMPTZ NOT NULL,
-            data JSONB
-        );
-        """
-
-        dbconn.execute(global_dynamic_table)
-        dbconn.execute(global_static_table)
-        dbconn.commit()
-
-        # Normalize parameter types
+        # The canonical SQL files below own the ais_global_* schema.
         raw_files = [str(f) for f in raw_files]  # Ensure file paths are strings
-        type_preference = [int(tp) for tp in type_preference]  # Ensure types are integers
 
         if timescaledb:
-            with open(os.path.join(sqlpath, "timescale_createtable_dynamic.sql"), "r") as f:
+            with open(
+                os.path.join(sqlpath, "timescale_createtable_dynamic.sql"), "r"
+            ) as f:
                 create_dynamic_table_stmt = f.read()
-            with open(os.path.join(sqlpath, "timescale_createtable_static.sql"), "r") as f:
+            with open(
+                os.path.join(sqlpath, "timescale_createtable_static.sql"), "r"
+            ) as f:
                 create_static_table_stmt = f.read()
 
             dbconn.execute(create_dynamic_table_stmt)
@@ -211,28 +210,49 @@ def process_raw_files(dbconn, dbindex, raw_files, source, timescaledb, raw_inser
                 dbconn.drop_indexes(verbose=verbose, timescaledb=timescaledb)
             dbconn.commit()
         else:
-            with open(os.path.join(sqlpath, "psql_createtable_dynamic_noindex.sql"), "r") as f:
+            with open(
+                os.path.join(sqlpath, "psql_createtable_dynamic_noindex.sql"), "r"
+            ) as f:
                 create_dynamic_table_stmt = f.read()
             with open(os.path.join(sqlpath, "psql_createtable_static.sql"), "r") as f:
                 create_static_table_stmt = f.read()
 
+            # The Rust writers insert into the global tables; per-month tables
+            # are kept for the aggregate/index helpers that operate monthly.
+            dbconn.execute(create_dynamic_table_stmt.format("global"))
+            dbconn.execute(create_static_table_stmt.format("global"))
             for month in months:
                 dbconn.execute(create_dynamic_table_stmt.format(month))
                 dbconn.execute(create_static_table_stmt.format(month))
             dbconn.commit()
 
-        completed_files = decoder(dbpath="",
-                                  psql_conn_string=dbconn.connection_string,
-                                  files=raw_files,
-                                  source=source, verbose=verbose,
-                                  workers=workers, type_preference=type_preference, allow_swap=False)
+        completed_files = decoder(
+            dbpath="",
+            psql_conn_string=dbconn.connection_string,
+            files=raw_files,
+            source=source,
+            verbose=verbose,
+            workers=workers,
+            type_preference=type_preference,
+            allow_swap=False,
+        )
+        # Surface silent ingestion failures: the Rust decoder returns only the
+        # files that completed; if every input errored, raise instead of
+        # reporting success over an empty insert.
+        if raw_files and not completed_files:
+            raise RuntimeError(
+                f"decoder failed for all {len(raw_files)} input files; "
+                "see stderr for per-file errors"
+            )
     else:
         raise ValueError("Unsupported DB connection")
 
     if verbose and not skip_checksum:
         print("saving checksums...")
 
-    for filename, signature in zip(not_zipped + unzipped, not_zipped_checksums + unzipped_checksums):
+    for filename, signature in zip(
+        not_zipped + unzipped, not_zipped_checksums + unzipped_checksums
+    ):
         if filename in completed_files:
             dbindex.insert_checksum(signature)
         else:
@@ -255,7 +275,7 @@ def process_raw_files(dbconn, dbindex, raw_files, source, timescaledb, raw_inser
         if not raw_insertion and timescaledb:
             dbconn.rebuild_indexes(verbose=verbose, timescaledb=timescaledb)
             dbconn.execute("ANALYZE")
-        dbconn.commit()     
+        dbconn.commit()
 
     if timescaledb:
         dbconn.aggregate_static_msgs(verbose=verbose)
@@ -277,8 +297,18 @@ def process_raw_files(dbconn, dbindex, raw_files, source, timescaledb, raw_inser
     return completed_files
 
 
-def decode_msgs(filepaths, dbconn, source, vacuum=False, skip_checksum=True,
-                workers=4, type_preference="all", raw_insertion=True, verbose=True, timescaledb=False):
+def decode_msgs(
+    filepaths,
+    dbconn,
+    source,
+    vacuum=False,
+    skip_checksum=True,
+    workers=4,
+    type_preference="all",
+    raw_insertion=True,
+    verbose=True,
+    timescaledb=False,
+):
     """
     Decode messages from filepaths and insert them into a database.
 
@@ -294,9 +324,10 @@ def decode_msgs(filepaths, dbconn, source, vacuum=False, skip_checksum=True,
     :param timescaledb: whether to insert data to a database with timescale extension (default is False)
     :return: None
     """
-    if not isinstance(dbconn,PostgresDBConn):  # pragma: no cover
-        raise ValueError("db argument must be a DBConn database connection. "
-                         f"got {dbconn}")
+    if not isinstance(dbconn, PostgresDBConn):  # pragma: no cover
+        raise ValueError(
+            f"db argument must be a DBConn database connection. got {dbconn}"
+        )
 
     if len(filepaths) == 0:  # pragma: no cover
         raise ValueError("must supply atleast one filepath.")
@@ -304,7 +335,9 @@ def decode_msgs(filepaths, dbconn, source, vacuum=False, skip_checksum=True,
     dbindex = FileChecksums(dbconn=dbconn)
 
     # handle zipfiles
-    zipped = {f for f in filepaths if f.lower()[-4:] == ".zip" or f.lower()[-3:] == ".gz"}
+    zipped = {
+        f for f in filepaths if f.lower()[-4:] == ".zip" or f.lower()[-3:] == ".gz"
+    }
     not_zipped = sorted(list(set(filepaths) - set(zipped)))
 
     not_zipped_checksums = []
@@ -343,9 +376,17 @@ def decode_msgs(filepaths, dbconn, source, vacuum=False, skip_checksum=True,
                     print(f"found matching checksum, skipping {item}")
             else:
                 zipped_checksums.append(signature)
-    
+
+    # Track per-batch failures so a fully-failed run raises instead of
+    # silently reporting success.
+    batches_attempted = 0
+    batches_failed = 0
+
     # Process not zipped files
-    for not_zip_file, checksum in zip(not_zipped, not_zipped_checksums if not skip_checksum else [None]*len(not_zipped)):
+    for not_zip_file, checksum in zip(
+        not_zipped,
+        not_zipped_checksums if not skip_checksum else [None] * len(not_zipped),
+    ):
         print(f"Cleaning temp dir: {dbindex.tmp_dir}")
         shutil.rmtree(dbindex.tmp_dir, ignore_errors=True)
         os.makedirs(dbindex.tmp_dir, exist_ok=True)
@@ -357,19 +398,30 @@ def decode_msgs(filepaths, dbconn, source, vacuum=False, skip_checksum=True,
             raw_files = current_not_zipped  # not_zipped + unzipped no longer needed
 
             completed_files = process_raw_files(
-                dbconn, dbindex, raw_files, source, timescaledb, raw_insertion,
-                vacuum, verbose, workers, type_preference,
-                current_not_zipped, [],  # nothing unzipped here
-                current_not_zipped_checksums, [],  # only not_zipped checksums
-                skip_checksum
+                dbconn,
+                dbindex,
+                raw_files,
+                source,
+                timescaledb,
+                raw_insertion,
+                vacuum,
+                verbose,
+                workers,
+                type_preference,
+                current_not_zipped,
+                [],  # nothing unzipped here
+                current_not_zipped_checksums,
+                [],  # only not_zipped checksums
+                skip_checksum,
             )
         except Exception as e:
             print(f"Failed to process {not_zip_file}: {e}")
+            batches_failed += 1
             continue
+        finally:
+            batches_attempted += 1
 
-    
     # Process zipped files
-    
 
     def batched(iterable, n):
         """Batch data into lists of length n."""
@@ -396,11 +448,13 @@ def decode_msgs(filepaths, dbconn, source, vacuum=False, skip_checksum=True,
                 continue
 
         # collect all .csv files just unzipped
-        current_unzipped = sorted([
-            os.path.join(dbindex.tmp_dir, f)
-            for f in os.listdir(dbindex.tmp_dir)
-            if f.endswith(".csv")
-        ])
+        current_unzipped = sorted(
+            [
+                os.path.join(dbindex.tmp_dir, f)
+                for f in os.listdir(dbindex.tmp_dir)
+                if f.endswith(".csv")
+            ]
+        )
 
         # calculate checksums if needed
         if not skip_checksum:
@@ -413,15 +467,35 @@ def decode_msgs(filepaths, dbconn, source, vacuum=False, skip_checksum=True,
 
         try:
             completed_files = process_raw_files(
-                dbconn, dbindex, raw_files, source, timescaledb,
-                raw_insertion, vacuum, verbose, workers, type_preference,
-                not_zipped, current_unzipped,
-                not_zipped_checksums, current_unzipped_checksums,
-                skip_checksum
+                dbconn,
+                dbindex,
+                raw_files,
+                source,
+                timescaledb,
+                raw_insertion,
+                vacuum,
+                verbose,
+                workers,
+                type_preference,
+                not_zipped,
+                current_unzipped,
+                not_zipped_checksums,
+                current_unzipped_checksums,
+                skip_checksum,
             )
         except Exception as e:
             print(f"Failed to process batch {[zf for zf, _ in zip_batch]}: {e}")
+            batches_failed += 1
             continue
+        finally:
+            batches_attempted += 1
 
         # Clean temp dir after batch
         shutil.rmtree(dbindex.tmp_dir, ignore_errors=True)
+
+    if batches_attempted and batches_failed == batches_attempted:
+        raise RuntimeError(
+            f"all {batches_attempted} decode batches failed; no data was inserted"
+        )
+    if batches_failed:
+        print(f"WARNING: {batches_failed}/{batches_attempted} decode batches failed")

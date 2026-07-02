@@ -4,7 +4,8 @@ import re
 import warnings
 from calendar import monthrange
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
+from urllib.parse import quote
 from enum import Enum
 
 import numpy as np
@@ -113,8 +114,8 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
                 if result and result['min'] is not None and result['max'] is not None:
                     min_ts, max_ts = result['min'], result['max']
                     self.db_daterange = {
-                        'start': datetime.utcfromtimestamp(int(min_ts)).date(),
-                        'end': datetime.utcfromtimestamp(int(max_ts)).date()
+                        'start': datetime.fromtimestamp(int(min_ts), tz=timezone.utc).date(),
+                        'end': datetime.fromtimestamp(int(max_ts), tz=timezone.utc).date()
                     }
                     print(f"Date range set using table: {table}")
                     return
@@ -153,13 +154,13 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
             self.connection_string = 'postgresql://'
 
             if 'user' in kwargs.keys():
-                self.connection_string += kwargs.pop('user')
+                self.connection_string += quote(kwargs.pop('user'), safe='')
             else:
                 self.connection_string += 'postgres'
 
             if 'password' in kwargs.keys():
                 self.connection_string += ':'
-                self.connection_string += kwargs.pop('password')
+                self.connection_string += quote(kwargs.pop('password'), safe='')
             self.connection_string += '@'
 
             if 'hostaddr' in kwargs.keys():
@@ -207,8 +208,6 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
 
         cur.execute(coarsetype_qry)
         coarsetype_exists = cur.fetchone()
-
-        print(coarsetype_exists)
 
         if not coarsetype_exists:
             self._create_table_coarsetype()
@@ -333,7 +332,7 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
             dbconn.execute('''
                 DELETE FROM ais_global_dynamic WHERE ctid IN (
                     SELECT ctid FROM (
-                        SELECT *, row_number() OVER (PARTITION BY mmsi, time, source ORDER BY ctid)
+                        SELECT *, row_number() OVER (PARTITION BY mmsi, time, latitude, longitude ORDER BY ctid)
                         FROM ais_global_dynamic
                     ) AS duplicates
                     WHERE row_number > 1
@@ -347,7 +346,7 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
         dbconn.execute(f'''
             DELETE FROM ais_{month}_dynamic WHERE ctid IN (
                 SELECT ctid FROM (
-                    SELECT *, row_number() OVER (PARTITION BY mmsi, time, source ORDER BY ctid)
+                    SELECT *, row_number() OVER (PARTITION BY mmsi, time, longitude, latitude ORDER BY ctid)
                     FROM ais_{month}_dynamic
                 ) AS duplicates_{month}
                 WHERE row_number > 1
@@ -434,7 +433,9 @@ class PostgresDBConn(_DBConn, psycopg.Connection):
         skip_nommsi = np.array(agg_rows, dtype=object)
         assert len(skip_nommsi.shape) == 2
         skip_nommsi = skip_nommsi[skip_nommsi[:, 0] != None]
-        assert len(skip_nommsi) > 1
+        if len(skip_nommsi) == 0:
+            warnings.warn('no valid MMSIs to aggregate! table: static_global_aggregate')
+            return
         insert_vals = ','.join(['%s' for _ in range(skip_nommsi.shape[1])])
         insert_stmt = psycopg.sql.SQL(
             f'INSERT INTO static_global_aggregate '
