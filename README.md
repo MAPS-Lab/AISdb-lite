@@ -91,7 +91,7 @@ Continuous integration builds wheels for Linux, macOS, and Windows and runs the 
 ## Related projects
 
 - [AISdb](https://github.com/MAPS-Lab/AISdb) is the canonical general-purpose package on [PyPI](https://pypi.org/project/aisdb/); this repository tracks the `vishvesh/dev` lineage of AISViz/AISdb
-- [NOAA-Integrator](https://github.com/MAPS-Lab/AISdb-NOAA-Integrator) acquires AIS data from NOAA Marine Cadastre and loads it into AISdb-aligned databases
+- [NOAA-Integrator](https://github.com/MAPS-Lab/NOAA-Integrator) acquires AIS data from NOAA Marine Cadastre and loads it into AISdb-aligned databases
 - [Tutorials](https://github.com/MAPS-Lab/AISdb-Tutorials) collects notebooks with worked examples for AISdb workflows
 
 ## License
